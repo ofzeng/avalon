@@ -1,5 +1,5 @@
 using POMDPs, POMDPToolbox, QMDP
-ns = 4000
+ns = 100
 mutable struct TigerPOMDP <: POMDP{Int64, Int64, Int64}
     r_listen::Float64
     r_findtiger::Float64
@@ -22,7 +22,7 @@ mutable struct TigerDistribution
     p::Float64
     it::Vector{Int64}
 end
-TigerDistribution() = TigerDistribution(1.0 / ns, 1:ns)
+TigerDistribution() = TigerDistribution(0.5, [1,2])
 POMDPs.iterator(d::TigerDistribution) = d.it
 
 function POMDPs.pdf(d::TigerDistribution, so::Int64)
@@ -37,19 +37,20 @@ POMDPs.n_observations(::TigerPOMDP) = 2
 
 # Resets the problem after opening door; does nothing after listening
 function POMDPs.transition(pomdp::TigerPOMDP, s::Int64, a::Int64)
-    d = TigerDistribution()
-    if a == 1 || a == 2
-        d.p = 0.5
-    elseif s == 1
-        d.p = 1.0
-    else
-        d.p = 0.0
-    end
+    d = TigerDistribution(0.5, [s, s % pomdp.num_states + 1])
+    #if a == 1 || a == 2
+        #d.p = 0.5
+    #elseif s == 1
+        #d.p = 1.0
+    #else
+        #d.p = 0.0
+    #end
     d
 end
 
 function POMDPs.observation(pomdp::TigerPOMDP, a::Int64, sp::Int64)
     d = TigerDistribution()
+    #d = TigerDistribution(0.5, [sp, sp % pomdp.num_states + 1])
     pc = pomdp.p_listen_correctly
     if a == 1
         sp == 1 ? (d.p = pc) : (d.p = 1.0-pc)
@@ -77,7 +78,7 @@ function POMDPs.reward(pomdp::TigerPOMDP, s::Int64, a::Int64)
 end
 POMDPs.reward(pomdp::TigerPOMDP, s::Int64, a::Int64, sp::Int64) = reward(pomdp, s, a)
 
-POMDPs.initial_state_distribution(pomdp::TigerPOMDP) = TigerDistribution(1.0 / ns, 1:ns)
+POMDPs.initial_state_distribution(pomdp::TigerPOMDP) = TigerDistribution(0.5, [1,2])
 
 POMDPs.actions(::TigerPOMDP) = [1,2,3]
 
