@@ -175,7 +175,7 @@ end
 #States are ordered in dag order to make easier single pass value iteration
 function gameToInt(game::Game, agent::Int)
     if game.currentEvent == :begin
-        return 1
+        return maxState
     end
     i = 2
     statesPerMission = 5 * 3 * 32 * 10 * 10 * 5 # proposer, currentEvent, pass/fail, goodpeople, proposal, agent
@@ -183,11 +183,11 @@ function gameToInt(game::Game, agent::Int)
     #println("MAXSTATE $maxState")
     if game.currentEvent == :bad_wins
         i += 5 * statesPerMission
-        return i
+        return maxState - i + 1
     end
     if game.currentEvent == :good_wins
         i += 5 * statesPerMission + 1
-        return i
+        return maxState - i + 1
     end
     i += (game.missionNumber - 1) * statesPerMission
 
@@ -224,10 +224,11 @@ function gameToInt(game::Game, agent::Int)
 
     i += (agent - 1) * 1
     assert(i > 0 && i <= maxState)
-    return i
+    return maxState - i + 1
 end
 
 function intToGame(state::Int)
+    state = maxState - state + 1 # Reverse toposort order
     game = Game()
     if state == 1
         return (game, -1)
@@ -347,9 +348,9 @@ function testGameIntBijection()
 end
 
 function main()
-    #testGameIntBijection()
+    testGameIntBijection()
     #a = Game()
-    simulate(Game())
+    #simulate(Game())
 end
 
 main()
