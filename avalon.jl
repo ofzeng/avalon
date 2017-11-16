@@ -13,7 +13,7 @@ type Agent
     end
 end
 
-function combinations(n)
+function combinations_numbers(n)
     if n == 1
         return [(1), (2), (3), (4), (5)]
     elseif n == 2
@@ -23,6 +23,19 @@ function combinations(n)
     end
 end
 
+# One hot
+function combinations(n)
+    arrs = []
+    for combo in combinations_numbers(n)
+        arr = [false for _ in 1:5]
+        for i in combo
+            arr[i] = true
+        end
+        push!(arrs, arr)
+    end
+    arrs
+end
+
 type Game
     numPlayers::Int
     good::Array{Bool, 1}
@@ -30,38 +43,29 @@ type Game
     passes::Array{Bool, 1}
     proposer::Int
     proposal::Array{Bool, 1}
-    currentEvent::Symbol # :noop, :proposing, :mission
+    currentEvent::Symbol # :begin, :proposing, :mission, :done
 
     validActions::Function
     performActions::Function
-
-    function combinations(arr, n::Int)
-        combos = []
-        function combinations(arr, i, n, combo)
-            if n == 0
-                push!(combos, copy(combo))
-            end
-        end
-    end
+    completeMission::Function
+    completeGame::Function
+    isTerminal::Function
     
     function Game()
         this = new()
         this.numPlayers = 5
         this.missionNumber = 1
         this.proposer = 1
-        this.currentEvent = :noop
-        this.passes = [false] * 5
-        this.good = [false] * 5
-        for agent in combinations(3)[rand(1:this.numPlayers)] # Lol
-            this.good[agent] = true
-        end
+        this.currentEvent = :begin
+        this.passes = [false for _ in 1:this.numPlayers]
+        this.good = combinations(3)[rand(1:this.numPlayers)]
         this.validActions = function (agent::Int)
-            if this.currentEvent == :noop
-                return [0]
+            if this.currentEvent == :begin
+                return [:noop]
             end
             if this.currentEvent == :proposing
                 if agent != this.proposer
-                    return :noop
+                    return [:noop]
                 end
                 if this.missionNumber == 1
                     return combinations(1)
@@ -73,38 +77,140 @@ type Game
                 end
             end
             if this.currentEvent == :voting
-                return [0, 1]
+                return [:up, :down]
             end
             if this.currentEvent == :mission
                 if this.proposal[agent]
-                    return [1, 2]
+                    return [:pass, :fail]
                 else
-                    return :noop
+                    return [:noop]
                 end
+            end
+            if this.currentEvent == :done
+                return []
             end
             assert(false)
         end
 
+        this.isTerminal = function()
+            return this.currentEvent == :good_wins || this.currentEvent == :bad_wins
+        end
+
+        this.completeGame = function()
+            missions_won = sum(this.passes)
+            if missions_won >= 3
+                this.currentEvent = :good_wins
+            else
+                this.currentEvent = :bad_wins
+            end
+        end
+
+        this.completeMission = function(pass::Bool)
+            this.passes[this.missionNumber] = pass
+            if this.missionNumber == 5
+                this.completeGame()
+                return
+            end
+            this.missionNumber += 1
+            this.proposer = 1
+            this.currentEvent = :proposing
+        end
+
         this.performActions = function (actions::Array{Any, 1})
-            if this.currentEvent == :noop
+            if this.currentEvent == :begin
                 this.currentEvent = :proposing
                 assert(all([i == :noop for i in actions]))
-                return [(this.good[agent], 0) for agent in this.numPlayers]
+                return [this.good[agent] for agent in 1:this.numPlayers]
             end
             if this.currentEvent == :proposing
-                assert(all([actions[i] == :noop || this.proposer == i for i in actions]))
-                return [(:noop, 0) for agent in this.numPlayers]
+                #println(actions, this.proposer)
+                assert(all([(actions[i] == :noop && this.proposer != i) || 
+                            (this.proposer == i && typeof(actions[i]) == Array{Bool, 1}) for i in 1:this.numPlayers]))
+                this.proposal = actions[this.proposer]
+                this.currentEvent = :voting
+                return [this.proposal for agent in 1:this.numPlayers]
             end
+            if this.currentEvent == :voting
+                assert(all([i in [:up, :down] for i in actions]))
+                if sum([action == :up for action in actions]) > this.numPlayers / 2.0
+                    this.currentEvent = :mission
+                else
+                    if this.proposer == 5
+                        this.completeMission(true)
+                    else
+                        this.proposer += 1
+                        this.currentEvent = :proposing
+                    end
+                end
+                return [actions for agent in 1:this.numPlayers]
+            end
+            if this.currentEvent == :mission
+                assert(all([(actions[agent] in [:pass, :fail] && this.proposal[agent]) || 
+                            (actions[agent] == :noop && !this.proposal[agent]) for agent in 1:this.numPlayers]))
+                num_fails = sum([action == :fail for action in actions])
+                if this.missionNumber in [1,2,3,5] && num_fails >= 1
+                    this.completeMission(false)
+                elseif this.missionNumber == 4 && num_fails >= 2
+                    this.completeMission(false)
+                else
+                    this.completeMission(true)
+                end
+                return [num_fails for agent in 1:this.numPlayers]
+            end
+            if this.isTerminal()
+                return []
+            end
+            assert(false)
         end
         return this
     end
 
 end
 
+function simulate(game::Game)
+    function getAction()
+        try
+            a = readline()
+            return Int(a)
+            if a[1] == ':'
+                return Symbol(a[2:end])
+            elseif a[1] == '['
+                return include_string(a)
+            elseif all(isnumber, a)
+                return Int(a)
+            else
+                return a
+            end
+        end
+        return nothing
+    end
+    while !game.isTerminal()
+        actions = []
+        for i = 1:5
+            validActions = game.validActions(i)
+            action = nothing
+            while true
+                try
+                    println("You are agent $i, you can perform $validActions")
+                    action = validActions[parse(Int, readline())]
+                end
+                if !(action in validActions)
+                    println("Bad action, try again")
+                else
+                    break
+                end
+            end
+            push!(actions, action)
+        end
+        results = game.performActions(actions)
+        println("All players moved, result is $results")
+    end
+    println(game.currentEvent)
+end
+
 function main()
     a = Game()
-    println(a.validActions(1))
-    println("HEY")
+    simulate(a)
 end
 
 main()
