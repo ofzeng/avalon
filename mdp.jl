@@ -1,11 +1,17 @@
 using POMDPs, POMDPToolbox, QMDP
+
 using DiscreteValueIteration
 include("avalon.jl")
+include("agents.jl")
 ns = maxState
 
 type State
     game::Game
     agent::Int
+end
+
+function copy(state::State)
+    return State(copy(state.game), state.agent)
 end
 
 function stateToInt(state::State)
@@ -21,6 +27,15 @@ function intToState(int::Int)
 end
 
 mutable struct Avalon <: POMDP{State, Int64, Int64}
+    agents::Array{Agent, 1}
+    function Avalon()
+        this = new()
+        this.agents = []
+        for i = 1:numPlayers
+            push!(agents, StupidAgent())
+        end
+        this
+    end
 end
 
 POMDPs.state_index(::Avalon, s::State) = stateToInt(s)
@@ -55,14 +70,11 @@ function POMDPs.pdf(d::StateDistribution, so::State)
     #println(d, " ", so)
     so in d.it ? (return d.p) : (return 0)
     return
-    so == 1 ? (return d.p) : (return 1.0-d.p)
 end
 
 function POMDPs.pdf(d::Distribution, so::Int64)
-    #println(d, " ", so)
     so in d.it ? (return d.p) : (return 0)
     return
-    so == 1 ? (return d.p) : (return 1.0-d.p)
 end
 
 function POMDPs.rand(rng::AbstractRNG, d::Distribution)
@@ -81,14 +93,17 @@ POMDPs.n_actions(::Avalon) = 3
 POMDPs.n_observations(::Avalon) = 2
 
 function POMDPs.isterminal(pomdp::Avalon, s::State)
-    #return s == ns
     return s.game.currentEvent in [:bad_wins, :good_wins]
 end
 
 # Resets the problem after opening door; does nothing after listening
 function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     #d = Distribution(0.5, [max(s - 1, 1), max(s - 2, 1)])
-    d = StateDistribution(1, [s])
+    actions = [pomdp.agents[i].getAction(s) for i in 1:numPlayers]
+    #nextState = #intToState(min(maxState, stateToInt(s) + 1))
+    nextState = copy(s)
+    nextState.performActions(actions)
+    d = StateDistribution(1, [nextState])
     d
 end
 
@@ -101,20 +116,6 @@ function POMDPs.observation(pomdp::Avalon, s::Int64, a::Int64, sp::Int64)
     return observation(pomdp, a, sp)
 end
 
-
-#function POMDPs.reward(pomdp::Avalon, s::State, a::Int64)
-    #assert(s > 0)
-    #return 1
-    #r = 0.0
-    #a == 1 ? (r+=pomdp.r_listen) : (nothing)
-    #if a == 2
-        #s == 1 ? (r += pomdp.r_findtiger) : (r += pomdp.r_escapetiger)
-    #end
-    #if a == 3
-        #s == 1 ? (r += pomdp.r_escapetiger) : (r += pomdp.r_findtiger)
-    #end
-    #return r
-#end
 POMDPs.reward(pomdp::Avalon, s::State, a::Int64, sp::State) = Int(reward(sp.game, sp.agent))
 
 POMDPs.initial_state_distribution(pomdp::Avalon) = StateDistribution(1, [State()])
@@ -145,10 +146,12 @@ function main()
     tic = time()
     solver = QMDPSolver() # from QMDP
     policy = solve(solver, pomdp, verbose=true)
+    #save("my_policy.jld", "policy", policy)
     toc = time()
     println(toc - tic)
     tic = time()
     belief_updater = updater(policy) # the default QMDP belief updater (discrete Bayesian filter)
+    #save("my_updater.jld", "belief_updater", belief_updater)
     toc = time()
     println(toc - tic)
     return

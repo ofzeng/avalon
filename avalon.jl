@@ -4,19 +4,6 @@ numGoodPlayers = 3
 maxState = 5 * 5 * 3 * 32 * 10 * 10 * 5 + 3 # proposer, currentEvent, pass/fail, goodpeople, proposal, agent
 println("MAX $maxState")
 
-type Agent
-    getAction::Function
-    function Agent()
-        this = new()
-        this.getAction = function()
-        end
-        return this
-    end
-
-    function giveObservation()
-    end
-end
-
 function combinations_numbers(n)
     if n == 1
         return [(1), (2), (3), (4), (5)]
@@ -71,6 +58,10 @@ type Game
         this.good = [false for _ in 1:this.numPlayers]
         return this
     end
+end
+
+function copy(game::Game)
+    return Game(game.numPlayers, copy(game.good), game.missionNumber, copy(game.passes), game.proposer, game.proposal, game.currentEvent)
 end
 
 function reward(game::Game, agent::Int) # reward for entering state
@@ -242,16 +233,16 @@ function intToGame(state::Int)
     state = maxState - state + 1 # Reverse toposort order
     game = Game()
     if state == 1
-        return (game, -1)
+        return (game, 1) # Fake agent id; assign a crappy agent until we have a real one
     end
     statesPerMission = 5 * 3 * 32 * 10 * 10 * 5 # proposer, currentEvent, pass/fail, goodpeople, proposal
     if state == maxState - 1
         game.currentEvent = :bad_wins
-        return (game, -1)
+        return (game, 1)
     end
     if state == maxState
         game.currentEvent = :good_wins
-        return (game, -1)
+        return (game, 1)
     end
     i = state - 2
 
