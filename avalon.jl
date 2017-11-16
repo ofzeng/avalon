@@ -73,6 +73,17 @@ type Game
     end
 end
 
+function reward(game::Game, agent::Int) # reward for entering state
+    if game.currentEvent in [:bad_wins, :good_wins]
+        if game.good[agent]
+            return Int(game.currentEvent == :good_wins)
+        else
+            return Int(game.currentEvent == :bad_wins)
+        end
+    end
+    return 0
+end
+
 function validActions(this::Game, agent::Int)
     if this.currentEvent == :begin
         return [:noop]
@@ -348,7 +359,7 @@ function testGameIntBijection()
 end
 
 function main()
-    testGameIntBijection()
+    #testGameIntBijection()
     #a = Game()
     #simulate(Game())
 end
