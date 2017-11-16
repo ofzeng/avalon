@@ -1,5 +1,6 @@
-type startingInfo
-end
+numPlayers = 5
+numBadPlayers = 2
+numGoodPlayers = 3
 type Agent
     getAction::Function
     function Agent()
@@ -18,7 +19,7 @@ function combinations_numbers(n)
         return [(1), (2), (3), (4), (5)]
     elseif n == 2
         return [(1, 2), (1, 3), (1, 4), (1, 5), (2, 3), (2, 4), (2, 5), (3, 4), (3, 5), (4, 5)]
-    else
+    elseif n == 3
         return [(1, 2, 3), (1, 2, 4), (1, 2, 5), (1, 3, 4), (1, 3, 5), (1, 4, 5), (2, 3, 4), (2, 3, 5), (2, 4, 5), (3, 4, 5)]
     end
 end
@@ -34,6 +35,17 @@ function combinations(n)
         push!(arrs, arr)
     end
     arrs
+end
+
+function playersOnTeam(missionNumber)
+    if missionNumber == 1
+        return 1
+    elseif missionNumber == 2 || this.missionNumber == 3
+        return 2
+    else
+        assert(missionNumber == 4 || this.missionNumber == 5)
+        return 3
+    end
 end
 
 type Game
@@ -58,6 +70,7 @@ type Game
         this.proposer = 1
         this.currentEvent = :begin
         this.passes = [false for _ in 1:this.numPlayers]
+        this.proposal = [false for _ in 1:this.numPlayers]
         this.good = combinations(3)[rand(1:this.numPlayers)]
         this.validActions = function (agent::Int)
             if this.currentEvent == :begin
@@ -67,14 +80,8 @@ type Game
                 if agent != this.proposer
                     return [:noop]
                 end
-                if this.missionNumber == 1
-                    return combinations(1)
-                elseif this.missionNumber == 2 || this.missionNumber == 3
-                    return combinations(2)
-                else
-                    assert(this.missionNumber == 4 || this.missionNumber == 5)
-                    return combinations(3)
-                end
+                teamSize = playersOnTeam(this.missionNumber)
+                return combinations(teamSize)
             end
             if this.currentEvent == :voting
                 return [:up, :down]
@@ -164,7 +171,53 @@ type Game
         end
         return this
     end
+end
 
+#States are ordered in dag order to make easier single pass value iteration
+function gameToInt(game::Game, agent::Int)
+    if game.currentEvent == :begin
+        return 1
+    end
+    i = 2
+    statesPerMission = 5 * 3 * 32 * 10 * 10 * 5 # proposer, currentEvent, pass/fail, goodpeople, proposal
+    if game.currentEvent == :bad_wins
+        i += 5 * statesPerMission
+        return i
+    end
+    if game.currentEvent == :good_wins
+        i += 5 * statesPerMission + 1
+        return i
+    end
+    i += (game.missionNumber - 1) * statesPerMission
+
+    statesPerProposer = 3 * 32 * 10 * 10 * 5 # currentEvent, pass/fail, goodpeople, proposal
+    i += (game.proposer - 1) * statesPerProposer
+
+    statesPerEvent = 32 * 10 * 10 * 5 # pass/fail, goodpeople, proposal
+    eventNumber = Dict{Symbol, Int}(:proposing => 1, :voting => 2, :mission => 3)[game.currentEvent]
+    i += (eventNumber - 1) * statesPerEvent
+
+    statesPerPassFail = 10 * 10 * 5 # goodpeople, proposal
+    passFailNumber = sum([game.passes[i] ? 1 << (i - 1) : 0 for i in 1:5]) + 1
+    i += (passFailNumber - 1) * statesPerPassFail
+
+    statesPerGoodPeople = 10 * 5 # proposal
+    goodPeople = Tuple(game.good)
+    goodPeopleNumber = find(x -> Tuple(x) == goodPeople, combinations(numGoodPlayers))[1]
+    i += (goodPeopleNumber - 1) * statesPerGoodPeople
+
+    statesPerProposal = 5
+    proposal = Tuple(game.proposal)
+    proposalNumber = find(x -> Tuple(x) == proposal, combinations(playersOnTeam(game.missionNumber)))
+    if length(proposalNumber) == 0
+        proposalNumber = 0
+    else
+        proposalNumber = proposalNumber[1]
+    end
+    i += (proposalNumber - 1) * statesPerProposal
+
+    i += (agent - 1) * 1
+    return i
 end
 
 function simulate(game::Game)
@@ -187,6 +240,7 @@ function simulate(game::Game)
     while !game.isTerminal()
         actions = []
         for i = 1:5
+            println(gameToInt(game, i))
             validActions = game.validActions(i)
             action = nothing
             while true
@@ -210,6 +264,7 @@ end
 
 function main()
     a = Game()
+    b = Game()
     simulate(a)
 end
 
