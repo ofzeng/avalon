@@ -1,6 +1,9 @@
 numPlayers = 5
 numBadPlayers = 2
 numGoodPlayers = 3
+maxState = 5 * 5 * 3 * 32 * 10 * 10 * 5 + 3 # proposer, currentEvent, pass/fail, goodpeople, proposal, agent
+println("MAX $maxState")
+
 type Agent
     getAction::Function
     function Agent()
@@ -40,10 +43,10 @@ end
 function playersOnTeam(missionNumber)
     if missionNumber == 1
         return 1
-    elseif missionNumber == 2 || this.missionNumber == 3
+    elseif missionNumber == 2 || missionNumber == 3
         return 2
     else
-        assert(missionNumber == 4 || this.missionNumber == 5)
+        assert(missionNumber == 4 || missionNumber == 5)
         return 3
     end
 end
@@ -71,7 +74,7 @@ type Game
         this.currentEvent = :begin
         this.passes = [false for _ in 1:this.numPlayers]
         this.proposal = [false for _ in 1:this.numPlayers]
-        this.good = combinations(3)[rand(1:this.numPlayers)]
+        this.good = [false for _ in 1:this.numPlayers]
         this.validActions = function (agent::Int)
             if this.currentEvent == :begin
                 return [:noop]
@@ -125,6 +128,7 @@ type Game
 
         this.performActions = function (actions::Array{Any, 1})
             if this.currentEvent == :begin
+                this.good = combinations(3)[rand(1:this.numPlayers)]
                 this.currentEvent = :proposing
                 assert(all([i == :noop for i in actions]))
                 return [this.good[agent] for agent in 1:this.numPlayers]
@@ -179,7 +183,9 @@ function gameToInt(game::Game, agent::Int)
         return 1
     end
     i = 2
-    statesPerMission = 5 * 3 * 32 * 10 * 10 * 5 # proposer, currentEvent, pass/fail, goodpeople, proposal
+    statesPerMission = 5 * 3 * 32 * 10 * 10 * 5 # proposer, currentEvent, pass/fail, goodpeople, proposal, agent
+    assert(maxState == statesPerMission * 5 + 3)
+    #println("MAXSTATE $maxState")
     if game.currentEvent == :bad_wins
         i += 5 * statesPerMission
         return i
@@ -190,23 +196,27 @@ function gameToInt(game::Game, agent::Int)
     end
     i += (game.missionNumber - 1) * statesPerMission
 
-    statesPerProposer = 3 * 32 * 10 * 10 * 5 # currentEvent, pass/fail, goodpeople, proposal
+    statesPerProposer = 3 * 32 * 10 * 10 * 5 # currentEvent, pass/fail, goodpeople, proposal, agent
     i += (game.proposer - 1) * statesPerProposer
+    #println("I $i")
 
-    statesPerEvent = 32 * 10 * 10 * 5 # pass/fail, goodpeople, proposal
+    statesPerEvent = 32 * 10 * 10 * 5 # pass/fail, goodpeople, proposal, agent
     eventNumber = Dict{Symbol, Int}(:proposing => 1, :voting => 2, :mission => 3)[game.currentEvent]
     i += (eventNumber - 1) * statesPerEvent
+    #println("I $i")
 
-    statesPerPassFail = 10 * 10 * 5 # goodpeople, proposal
+    statesPerPassFail = 10 * 10 * 5 # goodpeople, proposal, agent
     passFailNumber = sum([game.passes[i] ? 1 << (i - 1) : 0 for i in 1:5]) + 1
     i += (passFailNumber - 1) * statesPerPassFail
+    #println("I $i")
 
-    statesPerGoodPeople = 10 * 5 # proposal
+    statesPerGoodPeople = 10 * 5 # proposal, agent
     goodPeople = Tuple(game.good)
     goodPeopleNumber = find(x -> Tuple(x) == goodPeople, combinations(numGoodPlayers))[1]
     i += (goodPeopleNumber - 1) * statesPerGoodPeople
+    #println("I $i")
 
-    statesPerProposal = 5
+    statesPerProposal = 5 # agent
     proposal = Tuple(game.proposal)
     proposalNumber = find(x -> Tuple(x) == proposal, combinations(playersOnTeam(game.missionNumber)))
     if length(proposalNumber) == 0
@@ -215,9 +225,71 @@ function gameToInt(game::Game, agent::Int)
         proposalNumber = proposalNumber[1]
     end
     i += (proposalNumber - 1) * statesPerProposal
+    #println("I $i")
 
     i += (agent - 1) * 1
+    assert(i > 0 && i <= maxState)
     return i
+end
+
+function intToGame(state::Int)
+    game = Game()
+    if state == 1
+        return (game, -1)
+    end
+    statesPerMission = 5 * 3 * 32 * 10 * 10 * 5 # proposer, currentEvent, pass/fail, goodpeople, proposal
+    if state == maxState - 1
+        game.currentEvent = :bad_wins
+        return (game, -1)
+    end
+    if state == maxState
+        game.currentEvent = :good_wins
+        return (game, -1)
+    end
+    i = state - 2
+
+    game.missionNumber = Int(floor(i / statesPerMission)) + 1
+    i -= (game.missionNumber - 1) * statesPerMission
+
+    statesPerProposer = 3 * 32 * 10 * 10 * 5 # currentEvent, pass/fail, goodpeople, proposal, agentId
+    game.proposer = Int(floor(i / statesPerProposer)) + 1
+    i -= (game.proposer - 1) * statesPerProposer
+
+    statesPerEvent = 32 * 10 * 10 * 5 # pass/fail, goodpeople, proposal, agentId
+    eventNumber = Int(floor(i / statesPerEvent)) + 1
+    game.currentEvent = Dict{Int, Symbol}(1 => :proposing, 2 => :voting, 3 => :mission)[eventNumber]
+    i -= (eventNumber - 1) * statesPerEvent
+
+    statesPerPassFail = 10 * 10 * 5 # goodpeople, proposal, agentId
+    passFailNumber = Int(floor(i / statesPerPassFail)) + 1
+    game.passes = [(passFailNumber - 1) & (1 << (i - 1)) > 0 for i in 1:5]
+    i -= (passFailNumber - 1) * statesPerPassFail
+
+    statesPerGoodPeople = 10 * 5 # proposal, agentId
+    goodPeopleNumber = Int(floor(i / statesPerGoodPeople)) + 1
+    game.good = combinations(numGoodPlayers)[goodPeopleNumber]
+    i -= (goodPeopleNumber - 1) * statesPerGoodPeople
+
+    statesPerProposal = 5 # agentId
+    proposalNumber = Int(floor(i / statesPerProposal)) + 1
+    proposals = combinations(playersOnTeam(game.missionNumber))
+    if proposalNumber > length(proposals)
+        proposalNumber = 1
+    end
+    game.proposal = combinations(playersOnTeam(game.missionNumber))[proposalNumber]
+    #proposal = Tuple(game.proposal)
+    #proposalNumber = find(x -> Tuple(x) == proposal, combinations(playersOnTeam(game.missionNumber)))
+    #if length(proposalNumber) == 0
+        #proposalNumber = 0
+    #else
+        #proposalNumber = proposalNumber[1]
+    #end
+    i -= (proposalNumber - 1) * statesPerProposal
+
+    agent = i + 1
+    i -= (agent - 1) * 1
+    assert(i == 0)
+    return (game, agent)
 end
 
 function simulate(game::Game)
@@ -240,7 +312,9 @@ function simulate(game::Game)
     while !game.isTerminal()
         actions = []
         for i = 1:5
-            println(gameToInt(game, i))
+            int = gameToInt(game, i)
+            #println(int)
+            #println(intToGame(int))
             validActions = game.validActions(i)
             action = nothing
             while true
@@ -263,6 +337,25 @@ function simulate(game::Game)
 end
 
 function main()
+    for i = 1:maxState
+        if i % 10000 == 0
+            println("i $i")
+        end
+        game, agent = intToGame(i)
+        int = gameToInt(game, agent)
+        if int != i
+            println("BAD: $i $int")
+            println("Game $game agent $agent")
+            #numPlayers::Int
+            #good::Array{Bool, 1}
+            #missionNumber::Int
+            #passes::Array{Bool, 1}
+            #proposer::Int
+            #proposal::Array{Bool, 1}
+            #currentEvent::Symbol # :begin, :proposing, :mission, :done
+            return
+        end
+    end
     a = Game()
     b = Game()
     simulate(a)
