@@ -189,6 +189,16 @@ function performActions(this::Game, actions::Array{Any, 1})
     assert(false)
 end
 
+function observationToInt(obs::Any)
+    if typeof(obs) == Int
+        return obs + 1
+    else
+        conversion = Dict(true => 1, false => 0, :pass => 1, :fail => 0, :up => 1, :down => 0)
+        newObs = sum([(conversion[item]) << (i - 1) for i in 1:length(obs)])
+        return newObs + 1
+    end
+end
+
 function performIntActions(this::Game, intActions::Array{Int, 1})
     trueActions::Array{Any, 1} = [:noop for i in intActions]
     if this.currentEvent == :begin
@@ -200,11 +210,11 @@ function performIntActions(this::Game, intActions::Array{Int, 1})
         end
         trueActions[this.proposer] = options[choice]
     elseif this.currentEvent == :voting
-        trueActions = [i == 1 ? :up : :down for i in intActions]
+        trueActions = [i == 1 ? :down : :up for i in intActions]
     elseif this.currentEvent == :mission
         for i in 1:length(intActions)
             if this.proposal[i]
-                trueActions[i] = intActions[i] == 1 ? :pass : :fail
+                trueActions[i] = intActions[i] == 1 ? :fail : :pass
             end
         end
     end

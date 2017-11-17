@@ -1,4 +1,4 @@
-using POMDPs, POMDPToolbox, QMDP, JLD
+using POMDPs, POMDPToolbox, QMDP
 
 using DiscreteValueIteration
 include("avalon.jl")
@@ -130,13 +130,23 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     d
 end
 
-function POMDPs.observation(pomdp::Avalon, a::Int64, sp::State)
-    d = Distribution(0.5, [0, 1])
-    d
-end
+#function POMDPs.observation(pomdp::Avalon, a::Int64, sp::State)
+    #d = Distribution(0.5, [0, 1])
+    #d
+#end
 
 function POMDPs.observation(pomdp::Avalon, s::Int64, a::Int64, sp::Int64)
-    return observation(pomdp, a, sp)
+    if POMDPs.isterminal(pomdp, s)
+        return StateDistribution(1, [s])
+    end
+    actions::Array{Int, 1} = [1 for i in 1:numPlayers] # todo add agents moves
+    actions[s.agent] = a
+    nextState = copy(s)
+    obs = performIntActions(nextState.game, actions)[s.agent]
+    intObs = observationToAction(obs)
+    d = StateDistribution(1, [intObs])
+    d
+    #return observation(pomdp, a, sp)
 end
 
 POMDPs.reward(pomdp::Avalon, s::State, a::Int64, sp::State) = Int(reward(sp.game, sp.agent))
@@ -147,11 +157,11 @@ POMDPs.actions(::Avalon) = Array(1:10)
 
 POMDPs.discount(pomdp::Avalon) = 1
 
-function POMDPs.generate_o(p::Avalon, s::Int64, rng::AbstractRNG)
-    assert(s > 0)
-    d = observation(p, 0, s) # obs distrubtion not action dependant
-    return rand(rng, d)
-end
+#function POMDPs.generate_o(p::Avalon, s::Int64, rng::AbstractRNG)
+    #assert(s > 0)
+    #d = observation(p, 0, s) # obs distrubtion not action dependant
+    #return rand(rng, d)
+#end
 
 # same for both state and observation
 Base.convert(::Type{Array{Float64}}, so::Int64, p::Avalon) = Float64[so]
@@ -173,12 +183,12 @@ function main()
     tic = time()
     solver = QMDPSolver() # from QMDP
     policy = solve(solver, pomdp, verbose=true)
-    save("my_policy.jld", "policy", policy)
+    #save("my_policy.jld", "policy", policy)
     toc = time()
     println(toc - tic)
     tic = time()
     belief_updater = updater(policy) # the default QMDP belief updater (discrete Bayesian filter)
-    save("my_updater.jld", "belief_updater", belief_updater)
+    #save("my_updater.jld", "belief_updater", belief_updater)
     toc = time()
     println(toc - tic)
     return
