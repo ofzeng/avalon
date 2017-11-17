@@ -236,7 +236,7 @@ function gameToInt(game::Game, agent::Int)
     proposal = Tuple(game.proposal)
     proposalNumber = find(x -> Tuple(x) == proposal, combinations(playersOnTeam(game.missionNumber)))
     if length(proposalNumber) == 0
-        proposalNumber = 0
+        proposalNumber = 1
     else
         proposalNumber = proposalNumber[1]
     end
