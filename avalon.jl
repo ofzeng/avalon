@@ -150,7 +150,6 @@ function performActions(this::Game, actions::Array{Any, 1})
         return [this.good[agent] for agent in 1:this.numPlayers]
     end
     if this.currentEvent == :proposing
-        #println(actions, this.proposer)
         assert(all([(actions[i] == :noop && this.proposer != i) || 
                     (this.proposer == i && typeof(actions[i]) == Array{Bool, 1}) for i in 1:this.numPlayers]))
         this.proposal = actions[this.proposer]
@@ -188,6 +187,28 @@ function performActions(this::Game, actions::Array{Any, 1})
         return []
     end
     assert(false)
+end
+
+function performIntActions(this::Game, intActions::Array{Int, 1})
+    trueActions::Array{Any, 1} = [:noop for i in intActions]
+    if this.currentEvent == :begin
+    elseif this.currentEvent == :proposing
+        options = combinations(playersOnTeam(this.missionNumber))
+        choice = intActions[this.proposer]
+        if choice > length(options)
+            choice = 1
+        end
+        trueActions[this.proposer] = options[choice]
+    elseif this.currentEvent == :voting
+        trueActions = [i == 1 ? :up : :down for i in intActions]
+    elseif this.currentEvent == :mission
+        for i in 1:length(intActions)
+            if this.proposal[i]
+                trueActions[i] = intActions[i] == 1 ? :pass : :fail
+            end
+        end
+    end
+    return performActions(this, trueActions)
 end
 
 #States are ordered in dag order to make easier single pass value iteration

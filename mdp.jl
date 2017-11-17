@@ -1,4 +1,4 @@
-using POMDPs, POMDPToolbox, QMDP
+using POMDPs, POMDPToolbox, QMDP, JLD
 
 using DiscreteValueIteration
 include("avalon.jl")
@@ -110,7 +110,7 @@ function POMDPs.rand(rng::AbstractRNG, d::Distribution)
 end
 
 POMDPs.n_states(a::Avalon) = maxState
-POMDPs.n_actions(::Avalon) = 3
+POMDPs.n_actions(::Avalon) = 10
 POMDPs.n_observations(::Avalon) = 2
 
 function POMDPs.isterminal(pomdp::Avalon, s::State)
@@ -122,11 +122,10 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     if POMDPs.isterminal(pomdp, s)
         return StateDistribution(1, [s])
     end
-    #d = Distribution(0.5, [max(s - 1, 1), max(s - 2, 1)])
-    actions::Array{Any, 1} = [pomdp.agents[i].getAction(State(s.game, i)) for i in 1:numPlayers]
-    #nextState = #intToState(min(maxState, stateToInt(s) + 1))
+    actions::Array{Int, 1} = [1 for i in 1:numPlayers] # todo add agents moves
+    actions[s.agent] = a
     nextState = copy(s)
-    performActions(nextState.game, actions)
+    performIntActions(nextState.game, actions)
     d = StateDistribution(1, [nextState])
     d
 end
@@ -144,9 +143,9 @@ POMDPs.reward(pomdp::Avalon, s::State, a::Int64, sp::State) = Int(reward(sp.game
 
 POMDPs.initial_state_distribution(pomdp::Avalon) = StateDistribution(1, [intToState(maxState)])
 
-POMDPs.actions(::Avalon) = [1,2,3]
+POMDPs.actions(::Avalon) = Array(1:10)
 
-POMDPs.discount(pomdp::Avalon) = 0.95
+POMDPs.discount(pomdp::Avalon) = 1
 
 function POMDPs.generate_o(p::Avalon, s::Int64, rng::AbstractRNG)
     assert(s > 0)
@@ -163,6 +162,7 @@ function main()
     copy(State(Game(), 1))
     transition(pomdp, State(Game(), 1), 1)
     intToState(maxState - 240001 + 1)
+    stateToInt(State(Game(0, 5, [true, true, true, false, false], 1, [false, false, false, false, false], 1, [false, false, false, false, false], :proposing), 1))
 
     #solver = ValueIterationSolver()
     #policy = solve(solver, pomdp, verbose=true)
@@ -173,12 +173,12 @@ function main()
     tic = time()
     solver = QMDPSolver() # from QMDP
     policy = solve(solver, pomdp, verbose=true)
-    #save("my_policy.jld", "policy", policy)
+    save("my_policy.jld", "policy", policy)
     toc = time()
     println(toc - tic)
     tic = time()
     belief_updater = updater(policy) # the default QMDP belief updater (discrete Bayesian filter)
-    #save("my_updater.jld", "belief_updater", belief_updater)
+    save("my_updater.jld", "belief_updater", belief_updater)
     toc = time()
     println(toc - tic)
     return
