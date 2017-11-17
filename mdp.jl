@@ -2,7 +2,6 @@ using POMDPs, POMDPToolbox, QMDP
 
 using DiscreteValueIteration
 include("avalon.jl")
-include("agents.jl")
 ns = maxState
 
 type State
@@ -10,15 +9,36 @@ type State
     agent::Int
 end
 
+abstract type Agent
+end
+
+type StupidAgent <: Agent
+    getAction::Function
+
+    function StupidAgent()
+        this = new()
+        this.getAction = function(s::State)
+            actions = validActions(s.game, s.agent)
+            if length(actions) > 0
+                return actions[1]
+            end
+            return nothing
+        end
+        this
+    end
+end
+
 function copy(state::State)
     return State(copy(state.game), state.agent)
 end
 
 function stateToInt(state::State)
+    assert(state.agent in 1:numPlayers)
     return gameToInt(state.game, state.agent)
 end
 
 function intToState(int::Int)
+    assert(int >= 1 && int <= maxState)
     if int % 10000 == 0
         println("Converting $int")
     end
@@ -32,7 +52,7 @@ mutable struct Avalon <: POMDP{State, Int64, Int64}
         this = new()
         this.agents = []
         for i = 1:numPlayers
-            push!(agents, StupidAgent())
+            push!(this.agents, StupidAgent())
         end
         this
     end
@@ -47,6 +67,7 @@ end
 Base.start(::AvalonIterator) = 1
 Base.next(::AvalonIterator, state::Int) = intToState(state), state + 1
 Base.done(::AvalonIterator, state::Int) = state == maxState + 1
+#Base.done(::AvalonIterator, state::Int) = state == 50000 + 1
 POMDPs.iterator(a::AvalonIterator) = a
 POMDPs.states(a::Avalon) = AvalonIterator()
 POMDPs.observations(a::Avalon) = Array(0:1)
@@ -98,11 +119,14 @@ end
 
 # Resets the problem after opening door; does nothing after listening
 function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
+    if POMDPs.isterminal(pomdp, s)
+        return StateDistribution(1, [s])
+    end
     #d = Distribution(0.5, [max(s - 1, 1), max(s - 2, 1)])
-    actions = [pomdp.agents[i].getAction(s) for i in 1:numPlayers]
+    actions::Array{Any, 1} = [pomdp.agents[i].getAction(State(s.game, i)) for i in 1:numPlayers]
     #nextState = #intToState(min(maxState, stateToInt(s) + 1))
     nextState = copy(s)
-    nextState.performActions(actions)
+    performActions(nextState.game, actions)
     d = StateDistribution(1, [nextState])
     d
 end
@@ -118,7 +142,7 @@ end
 
 POMDPs.reward(pomdp::Avalon, s::State, a::Int64, sp::State) = Int(reward(sp.game, sp.agent))
 
-POMDPs.initial_state_distribution(pomdp::Avalon) = StateDistribution(1, [State()])
+POMDPs.initial_state_distribution(pomdp::Avalon) = StateDistribution(1, [intToState(maxState)])
 
 POMDPs.actions(::Avalon) = [1,2,3]
 
@@ -136,6 +160,9 @@ Base.convert(::Type{Int64}, so::Vector{Float64}, p::Avalon) = Int64(so[1])
 
 function main()
     pomdp = Avalon()
+    copy(State(Game(), 1))
+    transition(pomdp, State(Game(), 1), 1)
+    intToState(maxState - 240001 + 1)
 
     #solver = ValueIterationSolver()
     #policy = solve(solver, pomdp, verbose=true)

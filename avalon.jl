@@ -1,3 +1,4 @@
+import Base.copy
 numPlayers = 5
 numBadPlayers = 2
 numGoodPlayers = 3
@@ -39,6 +40,7 @@ function playersOnTeam(missionNumber)
 end
 
 type Game
+    realIndex::Int
     numPlayers::Int
     good::Array{Bool, 1}
     missionNumber::Int
@@ -49,6 +51,7 @@ type Game
     
     function Game()
         this = new()
+        this.realIndex = 0
         this.numPlayers = 5
         this.missionNumber = 1
         this.proposer = 1
@@ -58,10 +61,23 @@ type Game
         this.good = [false for _ in 1:this.numPlayers]
         return this
     end
+
+    function Game(realIndex, numPlayers, good, missionNumber, passes, proposer, proposal, currentEvent)
+        this = new()
+        this.realIndex = realIndex
+        this.numPlayers = numPlayers
+        this.missionNumber = missionNumber
+        this.proposer = proposer
+        this.currentEvent = currentEvent
+        this.passes = passes
+        this.proposal = proposal
+        this.good = good
+        return this
+    end
 end
 
 function copy(game::Game)
-    return Game(game.numPlayers, copy(game.good), game.missionNumber, copy(game.passes), game.proposer, game.proposal, game.currentEvent)
+    return Game(game.realIndex, game.numPlayers, copy(game.good), game.missionNumber, copy(game.passes), game.proposer, game.proposal, game.currentEvent)
 end
 
 function reward(game::Game, agent::Int) # reward for entering state
@@ -96,7 +112,7 @@ function validActions(this::Game, agent::Int)
             return [:noop]
         end
     end
-    if this.currentEvent == :done
+    if this.currentEvent in [:good_wins, :bad_wins]
         return []
     end
     assert(false)
@@ -176,6 +192,9 @@ end
 
 #States are ordered in dag order to make easier single pass value iteration
 function gameToInt(game::Game, agent::Int)
+    if game.realIndex > 0
+        return game.realIndex
+    end
     if game.currentEvent == :begin
         return maxState
     end
@@ -225,12 +244,15 @@ function gameToInt(game::Game, agent::Int)
     #println("I $i")
 
     i += (agent - 1) * 1
+    if (!(i > 0 && i <= maxState))
+        println("Game $game agent $agent i $i")
+    end
     assert(i > 0 && i <= maxState)
     return maxState - i + 1
 end
 
-function intToGame(state::Int)
-    state = maxState - state + 1 # Reverse toposort order
+function intToGame(s::Int)
+    state = maxState - s + 1 # Reverse toposort order
     game = Game()
     if state == 1
         return (game, 1) # Fake agent id; assign a crappy agent until we have a real one
@@ -271,8 +293,10 @@ function intToGame(state::Int)
     statesPerProposal = 5 # agentId
     proposalNumber = Int(floor(i / statesPerProposal)) + 1
     proposals = combinations(playersOnTeam(game.missionNumber))
+    i -= (proposalNumber - 1) * statesPerProposal
     if proposalNumber > length(proposals)
         proposalNumber = 1
+        game.realIndex = s
     end
     game.proposal = combinations(playersOnTeam(game.missionNumber))[proposalNumber]
     #proposal = Tuple(game.proposal)
@@ -282,9 +306,14 @@ function intToGame(state::Int)
     #else
         #proposalNumber = proposalNumber[1]
     #end
-    i -= (proposalNumber - 1) * statesPerProposal
 
     agent = i + 1
+    if (!(agent in 1:numPlayers))
+        println(i)
+        println("Agent $agent i $state g $game")
+        println(maxState - state + 1)
+        error()
+    end
     i -= (agent - 1) * 1
     assert(i == 0)
     return (game, agent)
