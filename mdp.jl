@@ -1,4 +1,4 @@
-using POMDPs, POMDPToolbox, QMDP
+using POMDPs, POMDPToolbox, QMDP, JLD
 
 using DiscreteValueIteration
 include("avalon.jl")
@@ -60,7 +60,7 @@ end
 
 POMDPs.state_index(::Avalon, s::State) = stateToInt(s)
 POMDPs.action_index(::Avalon, a::Int64) = a
-POMDPs.obs_index(::Avalon, o::Int64) = o + 1
+POMDPs.obs_index(::Avalon, o::Int64) = o
 
 type AvalonIterator
 end
@@ -70,7 +70,7 @@ Base.done(::AvalonIterator, state::Int) = state == maxState + 1
 #Base.done(::AvalonIterator, state::Int) = state == 50000 + 1
 POMDPs.iterator(a::AvalonIterator) = a
 POMDPs.states(a::Avalon) = AvalonIterator()
-POMDPs.observations(a::Avalon) = Array(0:1)
+POMDPs.observations(a::Avalon) = Array(1:32)
 
 initial_belief(::Avalon) = DiscreteBelief()
 
@@ -88,7 +88,6 @@ POMDPs.iterator(d::Distribution) = d.it
 POMDPs.iterator(d::StateDistribution) = d.it
 
 function POMDPs.pdf(d::StateDistribution, so::State)
-    #println(d, " ", so)
     so in d.it ? (return d.p) : (return 0)
     return
 end
@@ -109,9 +108,20 @@ function POMDPs.rand(rng::AbstractRNG, d::Distribution)
     return 100000000
 end
 
+function POMDPs.rand(rng::AbstractRNG, d::StateDistribution)
+    weight = 1
+    for i = d.it
+        if rand(rng) <= d.p / weight
+            return i
+        end
+        weight -= d.p
+    end
+    return State()
+end
+
 POMDPs.n_states(a::Avalon) = maxState
 POMDPs.n_actions(::Avalon) = 10
-POMDPs.n_observations(::Avalon) = 2
+POMDPs.n_observations(::Avalon) = 32
 
 function POMDPs.isterminal(pomdp::Avalon, s::State)
     return s.game.currentEvent in [:bad_wins, :good_wins]
@@ -122,7 +132,7 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     if POMDPs.isterminal(pomdp, s)
         return StateDistribution(1, [s])
     end
-    actions::Array{Int, 1} = [1 for i in 1:numPlayers] # todo add agents moves
+    actions::Array{Int, 1} = [2 for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
     nextState = copy(s)
     performIntActions(nextState.game, actions)
@@ -139,7 +149,7 @@ function POMDPs.observation(pomdp::Avalon, s::Int64, a::Int64, sp::Int64)
     if POMDPs.isterminal(pomdp, s)
         return StateDistribution(1, [s])
     end
-    actions::Array{Int, 1} = [1 for i in 1:numPlayers] # todo add agents moves
+    actions::Array{Int, 1} = [2 for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
     nextState = copy(s)
     obs = performIntActions(nextState.game, actions)[s.agent]
@@ -169,32 +179,20 @@ Base.convert(::Type{Int64}, so::Vector{Float64}, p::Avalon) = Int64(so[1])
 
 function main()
     pomdp = Avalon()
-    copy(State(Game(), 1))
-    transition(pomdp, State(Game(), 1), 1)
-    intToState(maxState - 240001 + 1)
-    stateToInt(State(Game(0, 5, [true, true, true, false, false], 1, [false, false, false, false, false], 1, [false, false, false, false, false], :proposing), 1))
 
-    #solver = ValueIterationSolver()
-    #policy = solve(solver, pomdp, verbose=true)
-    #return
-    #probability_check(pomdp)
-    # initialize a solver and compute a policy
     println("BEGIN SOLVE")
     tic = time()
     solver = QMDPSolver() # from QMDP
     policy = solve(solver, pomdp, verbose=true)
-    #save("my_policy.jld", "policy", policy)
     toc = time()
     println(toc - tic)
     tic = time()
     belief_updater = updater(policy) # the default QMDP belief updater (discrete Bayesian filter)
-    #save("my_updater.jld", "belief_updater", belief_updater)
     toc = time()
     println(toc - tic)
-    return
 
     # run a short simulation with the QMDP policy
-    history = simulate(HistoryRecorder(max_steps=3), pomdp, policy, belief_updater)
+    history = simulate(HistoryRecorder(max_steps=40), pomdp, policy, belief_updater)
 
     # look at what happened
     i = 0
@@ -204,12 +202,11 @@ function main()
         println("belief was $b,")
         println("action $a was taken,")
         println("and observation $o was received. Reward $r\n")
-        discounted = r * (0.95 ^ i)
-        totalScore += discounted
-        println("D $discounted, total $totalScore\n")
         i += 1
     end
     println("Discounted reward was $(discounted_reward(history)).")
+    save("my_policy.jld", "policy", policy)
+    save("my_updater.jld", "belief_updater", belief_updater)
 end
 
 main()

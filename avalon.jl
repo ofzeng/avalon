@@ -350,7 +350,7 @@ function intToGame(s::Int)
     return (game, agent)
 end
 
-function simulate(game::Game)
+function simulateGame(game::Game)
     function getAction()
         try
             a = readline()
@@ -412,7 +412,7 @@ end
 function main()
     #testGameIntBijection()
     #a = Game()
-    #simulate(Game())
+    #simulateGame(Game())
 end
 
 main()
