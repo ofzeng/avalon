@@ -78,29 +78,35 @@ function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O)
     # initialize belief 
     fill!(bnew, 0.0)
     # iterate through each state in belief vector
+    num_nonzero = 0
     for (i, s) in enumerate(pomdp_states)
-        if i % 1000 == 0
+        if i % 100000 == 0
             println("i is $i")
         end
         if bold[i] == 0.0
             continue
         end
+        num_nonzero += 1
         td = transition(pomdp, s, a)
-        for (j, sp) in enumerate(td)
+        for (j, sp) in enumerate(td.it)
+            newJ = state_index(pomdp, sp)
             pp = pdf(td, sp)
-            bnew[j] += pp * bold[i]
+            od = observation(pomdp, s, a, sp)
+            pp *= pdf(od, o)
+            bnew[newJ] += pp * bold[i]
         end
     end
-    for (i, sp) in enumerate(pomdp_states)
-        if i % 1000 == 0
-            println("i is $i")
-        end
-        # get the distributions
-        od = observation(pomdp, a, sp)
-        # get prob of observation o from current distribution
-        probo = pdf(od, o)
-        bnew[i] *= probo
-    end
+    println("Iterated through $num_nonzero states")
+    #for (i, sp) in enumerate(pomdp_states)
+        #if i % 100000 == 0
+            #println("i is $i")
+        #end
+        ## get the distributions
+        #od = observation(pomdp, a, sp)
+        ## get prob of observation o from current distribution
+        #probo = pdf(od, o)
+        #bnew[i] *= probo
+    #end
     norm = sum(bnew)
     # if norm is zero, the update was invalid - reset to uniform
     if norm == 0.0

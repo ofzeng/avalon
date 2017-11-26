@@ -194,7 +194,7 @@ function observationToInt(obs::Any)
         return obs + 1
     else
         conversion = Dict(true => 1, false => 0, :pass => 1, :fail => 0, :up => 1, :down => 0)
-        newObs = sum([(conversion[i]) << (i - 1) for i in 1:length(obs)])
+        newObs = sum([(conversion[obs[i]]) << (i - 1) for i in 1:length(obs)])
         return newObs + 1
     end
 end
@@ -390,6 +390,8 @@ function simulateGame(game::Game)
         end
         results = performActions(game, actions)
         println("All players moved, result is $results")
+        #intResults = [observationToInt(result) for result in results]
+        #println("All players moved, result is $intResults")
     end
     println(game.currentEvent)
 end
