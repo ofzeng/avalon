@@ -143,6 +143,7 @@ function completeMission(this::Game, pass::Bool)
 end
 
 function performActions(this::Game, actions::Array{Any, 1})
+    this.realIndex = 0
     if this.currentEvent == :begin
         this.good = combinations(3)[rand(1:this.numPlayers)]
         this.currentEvent = :proposing
@@ -285,6 +286,7 @@ end
 function intToGame(s::Int)
     state = maxState - s + 1 # Reverse toposort order
     game = Game()
+    game.realIndex = s
     if state == 1
         return (game, 1) # Fake agent id; assign a crappy agent until we have a real one
     end
@@ -327,7 +329,6 @@ function intToGame(s::Int)
     i -= (proposalNumber - 1) * statesPerProposal
     if proposalNumber > length(proposals)
         proposalNumber = 1
-        game.realIndex = s
     end
     game.proposal = combinations(playersOnTeam(game.missionNumber))[proposalNumber]
     #proposal = Tuple(game.proposal)

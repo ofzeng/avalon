@@ -2,6 +2,8 @@ using POMDPs, POMDPToolbox, QMDP, JLD
 
 using DiscreteValueIteration
 include("avalon.jl")
+
+restore = false
 ns = maxState
 
 type State
@@ -70,9 +72,14 @@ POMDPs.obs_index(::Avalon, o::Int64) = o
 #Base.done(::AvalonIterator, state::Int) = state == maxState + 1
 ##Base.done(::AvalonIterator, state::Int) = state == 50000 + 1
 #POMDPs.iterator(a::AvalonIterator) = a
-statesArray = []
-for i = 1:maxState
-    push!(statesArray,intToState(i))
+if !restore
+    statesArray = []
+    for i = 1:maxState
+        push!(statesArray,intToState(i))
+    end
+    save("my_states.jld", "states", statesArray)
+else
+    statesArray = load("my_states")["states"]
 end
 POMDPs.states(a::Avalon) = statesArray
 POMDPs.observations(a::Avalon) = Array(1:32)
@@ -198,7 +205,6 @@ Base.convert(::Type{Array{Float64}}, so::Int64, p::Avalon) = Float64[so]
 Base.convert(::Type{Int64}, so::Vector{Float64}, p::Avalon) = Int64(so[1])
 
 function main()
-    restore = true
     pomdp = Avalon()
     policy = nothing
     belief_updater = nothing
@@ -235,7 +241,13 @@ function main()
     totalScore = 0
     for (s, b, a, o, r) in eachstep(history, "sbaor")
         println("State was $s,")
-        println("belief was $b,")
+        nonzero = []
+        for (j, bp) in enumerate(b.b)
+            if bp > 0
+                push!(nonzero, (j, bp))
+            end
+        end
+        println("belief was $nonzero,")
         println("action $a was taken,")
         println("and observation $o was received. Reward $r\n")
         i += 1

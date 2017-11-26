@@ -80,9 +80,6 @@ function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O)
     # iterate through each state in belief vector
     num_nonzero = 0
     for (i, s) in enumerate(pomdp_states)
-        if i % 100000 == 0
-            println("i is $i")
-        end
         if bold[i] == 0.0
             continue
         end
