@@ -150,7 +150,7 @@ function performActions(this::Game, actions::Array{Any, 1}; seed::Int=-1)
         this.good = combinations(3)[seed]
         this.currentEvent = :proposing
         assert(all([i == :noop for i in actions]))
-        return [this.good[agent] for agent in 1:this.numPlayers]
+        return [this.good[agent] + 2 * agent for agent in 1:this.numPlayers]
     end
     if this.currentEvent == :proposing
         assert(all([(actions[i] == :noop && this.proposer != i) || 

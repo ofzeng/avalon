@@ -3,7 +3,7 @@ using POMDPs, POMDPToolbox, QMDP, JLD
 using DiscreteValueIteration
 include("avalon.jl")
 
-restore = false
+restore = true
 ns = maxState
 
 type State
@@ -31,6 +31,9 @@ function getAction(a::StupidAgent, g::Game, agent::Int)
         return 1
     end
     return nothing
+end
+
+function giveObservation(agent::StupidAgent, a::Int, o::Int)
 end
 
 function copy(state::State)
@@ -220,33 +223,39 @@ end
 Base.convert(::Type{Array{Float64}}, so::Int64, p::Avalon) = Float64[so]
 Base.convert(::Type{Int64}, so::Vector{Float64}, p::Avalon) = Int64(so[1])
 
-function main()
-    pomdp = Avalon()
-    policy = nothing
-    belief_updater = nothing
+type POMDPAgent <: Agent
+    pomdp::Any
+    policy::Any
+    updater::Any
+    belief::Any
+    
+    function POMDPAgent(pomdp, policy, belief_updater)
+        this = new()
+        this.pomdp = pomdp
+        this.policy = policy
+        this.updater = belief_updater
+        initial_state_dist = POMDPs.initial_state_distribution(pomdp)
+		initial_belief = initialize_belief(belief_updater, initial_state_dist)
+		# use of deepcopy inspired from rollout.jl
+		if initial_belief === initial_state_dist
+			initial_belief = deepcopy(initial_belief)
+        end
+        this.belief = initial_belief
 
-    if !restore
-        println("BEGIN SOLVE")
-        tic = time()
-        solver = QMDPSolver(max_iterations=1) # from QMDP
-        policy = solve(solver, pomdp, verbose=true)
-        toc = time()
-        println(toc - tic)
-        tic = time()
-        belief_updater = updater(policy) # the default QMDP belief updater (discrete Bayesian filter)
-        toc = time()
-        println(toc - tic)
-
-        println("BEGIN SAVING")
-        save("my_policy.jld", "policy", policy)
-        save("my_updater.jld", "belief_updater", belief_updater)
-        println("DONE SAVING")
-    else
-        println("BEGIN RESTORE")
-        policy = load("my_policy.jld")["policy"]
-        belief_updater = load("my_updater.jld")["belief_updater"]
-        println("END RESTORE")
+        this
     end
+end
+
+function getAction(a::POMDPAgent, g::Game, agent::Int)
+    a = action(a.policy, a.belief)
+end
+
+function giveObservation(agent::POMDPAgent, a::Int, o::Int)
+    update(agent.updater, agent.belief, a, o)
+end
+
+
+function runGames(pomdp, policy, belief_updater)
     numWins = 0
     for sim = 1:10
         # run a short simulation with the QMDP policy
@@ -275,6 +284,53 @@ function main()
         numWins += discounted_reward(history)
     end
     println("NUMWINS $numWins")
+end
+
+function playGame(pomdp, agents)
+    s = intToState(maxState)
+    while !isTerminal(s.game)
+        actions = [getAction(agents[i], s.game, i) for i = 1:numPlayers]
+        obs = performIntActions(s.game, actions)
+        for (i, ob) = enumerate(obs)
+            giveObservation(agents[i], actions[i], observationToInt(ob))
+        end
+        println(s)
+    end
+end
+
+function main()
+    pomdp = Avalon()
+    policy = nothing
+    belief_updater = nothing
+
+    if !restore
+        println("BEGIN SOLVE")
+        tic = time()
+        solver = QMDPSolver(max_iterations=1) # from QMDP
+        policy = solve(solver, pomdp, verbose=true)
+        toc = time()
+        println(toc - tic)
+        tic = time()
+        belief_updater = updater(policy) # the default QMDP belief updater (discrete Bayesian filter)
+        toc = time()
+        println(toc - tic)
+
+        println("BEGIN SAVING")
+        save("my_policy.jld", "policy", policy)
+        save("my_updater.jld", "belief_updater", belief_updater)
+        println("DONE SAVING")
+    else
+        println("BEGIN RESTORE")
+        policy = load("my_policy.jld")["policy"]
+        belief_updater = load("my_updater.jld")["belief_updater"]
+        println("END RESTORE")
+    end
+
+    #runGames(pomdp, policy, belief_updater)
+    agents::Array{Any, 1} = [StupidAgent() for i in 1:numPlayers]
+    agents[3] = POMDPAgent(pomdp, policy, belief_updater)
+    playGame(pomdp, agents)
+    
 end
 
 main()
