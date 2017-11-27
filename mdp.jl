@@ -193,7 +193,7 @@ function POMDPs.observation(pomdp::Avalon, s::State, a::Int64, sp::State)
     actions::Array{Int, 1} = [getAction(pomdp.agents[i], s.game, i) for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
     if s.game.currentEvent == :begin
-        return Distribution(1, [sp.agent])
+        return Distribution(1, [sp.agent * 2 + sp.game.good[sp.agent]])
     end
     nextState = copy(s)
     obs = performIntActions(nextState.game, actions)[sp.agent]
@@ -246,29 +246,34 @@ function main()
         belief_updater = load("my_updater.jld")["belief_updater"]
         println("END RESTORE")
     end
-    # run a short simulation with the QMDP policy
-    println("BEGIN SIMULATING")
-    history = simulate(HistoryRecorder(max_steps=100), pomdp, policy, belief_updater)
-    println("DONE SIMULATING")
+    numWins = 0
+    for sim = 1:10
+        # run a short simulation with the QMDP policy
+        println("BEGIN SIMULATING")
+        history = simulate(HistoryRecorder(max_steps=100), pomdp, policy, belief_updater)
+        println("DONE SIMULATING")
 
-    # look at what happened
-    i = 0
-    totalScore = 0
-    for (s, b, a, o, r) in eachstep(history, "sbaor")
-        println("State was $s,")
-        nonzero = []
-        for (j, bp) in enumerate(b.b)
-            if bp > 0
-                push!(nonzero, (j, bp))
+        # look at what happened
+        i = 0
+        totalScore = 0
+        for (s, b, a, o, r) in eachstep(history, "sbaor")
+            println("State was $s,")
+            nonzero = []
+            for (j, bp) in enumerate(b.b)
+                if bp > 0
+                    push!(nonzero, (j, bp))
+                end
             end
+            println("Belief state example ", intToState(nonzero[1][1]))
+            println("belief was $nonzero,")
+            println("action $a was taken,")
+            println("and observation $o was received. Reward $r\n")
+            i += 1
         end
-        println("Belief state example ", intToState(nonzero[1][1]))
-        println("belief was $nonzero,")
-        println("action $a was taken,")
-        println("and observation $o was received. Reward $r\n")
-        i += 1
+        println("Discounted reward was $(discounted_reward(history)).")
+        numWins += discounted_reward(history)
     end
-    println("Discounted reward was $(discounted_reward(history)).")
+    println("NUMWINS $numWins")
 end
 
 main()
