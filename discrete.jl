@@ -88,8 +88,9 @@ function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O)
         for (j, sp) in enumerate(td.it)
             newJ = state_index(pomdp, sp)
             pp = pdf(td, sp)
-            od = observation(pomdp, s, a, sp)
-            pp *= pdf(od, o)
+            od = td.obs[j]
+            #println("Old prob $pp, real ob $o, proposed $od, action taken $a")
+            pp *= (o == od)
             bnew[newJ] += pp * bold[i]
         end
     end

@@ -24,6 +24,9 @@ end
 function getAction(a::StupidAgent, g::Game, agent::Int)
     actions = validActions(g, agent)
     #return Int(hash(stateToInt(State(g, agent))) % length(actions)) + 1
+    if g.currentEvent in [:mission, :voting]
+        return 5
+    end
     return Int(hash(g.passes * 10 + g.proposer + g.good[1] * 100 + g.good[2] * 120 + g.good[3] * 420 + g.missionNumber * 719) % length(actions) + 1)
     if length(actions) > 1
         return 2
@@ -90,8 +93,14 @@ POMDPs.observations(a::Avalon) = Array(1:32)
 initial_belief(::Avalon) = DiscreteBelief()
 
 mutable struct StateDistribution
-    p::Float64
+    p::Vector{Float64}
     it::Vector{State}
+end
+
+mutable struct StateObservationDistribution
+    p::Vector{Float64}
+    it::Vector{State}
+    obs::Vector{Int}
 end
 
 mutable struct Distribution
@@ -103,10 +112,26 @@ end
 
 POMDPs.iterator(d::Distribution) = d.it
 POMDPs.iterator(d::StateDistribution) = d.it
+POMDPs.iterator(d::StateObservationDistribution) = d.it
 
 function POMDPs.pdf(d::StateDistribution, so::State)
-    so in d.it ? (return d.p) : (return 0)
-    return
+    results = find(x->x==so, d.it)
+    if length(results) == 0
+        return 0
+    end
+    assert(length(results) == 1)
+    index = results[1]
+    return d.p[index]
+end
+
+function POMDPs.pdf(d::StateObservationDistribution, so::State)
+    results = find(x->x==so, d.it)
+    if length(results) == 0
+        return 0
+    end
+    assert(length(results) == 1)
+    index = results[1]
+    return d.p[index]
 end
 
 function POMDPs.pdf(d::Distribution, so::Int64)
@@ -125,10 +150,10 @@ function POMDPs.rand(rng::AbstractRNG, d::Distribution)
     return 100000000
 end
 
-function POMDPs.rand(rng::AbstractRNG, d::StateDistribution)
+function POMDPs.rand(rng::AbstractRNG, d::StateObservationDistribution)
     weight = 1
     for i = d.it
-        if rand(rng) <= d.p / weight
+        if rand(rng) <= pdf(d, i) / weight
             return i
         end
         weight -= d.p
@@ -144,30 +169,68 @@ function POMDPs.isterminal(pomdp::Avalon, s::State)
     return s.game.currentEvent in [:bad_wins, :good_wins]
 end
 
+function enumerateTransitions(s::State, a::Int64, actionProbabilities, actions::Vector{Int}, i, prob, nextProbs::Vector{Float64}, nextStates::Vector{State}, nextObservations::Vector{Int})
+    if prob == 0
+        return
+    end
+    if i > length(actionProbabilities)
+        nextState = copy(s)
+        obs = performIntActions(nextState.game, actions)
+        ob = observationToInt(obs[s.agent])
+        push!(nextStates, nextState)
+        push!(nextProbs, prob)
+        push!(nextObservations, ob)
+        return
+    end
+    if s.agent == i
+        push!(actions, a)
+        enumerateTransitions(s, a, actionProbabilities, actions, i + 1, prob, nextProbs, nextStates, nextObservations)
+        pop!(actions)
+    else
+        actionProb = min((actionProbabilities[i] - 1) / 8.0, 1.0)
+        push!(actions, 1)
+        enumerateTransitions(s, a, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
+        pop!(actions)
+        actionProb = 1 - actionProb
+        push!(actions, 2)
+        enumerateTransitions(s, a, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
+        pop!(actions)
+    end
+end
+
 # Resets the problem after opening door; does nothing after listening
 function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     if POMDPs.isterminal(pomdp, s)
-        return StateDistribution(1, [s])
+        return StateObservationDistribution([1.0], [s], [1])
     end
     actions::Array{Int, 1} = [getAction(pomdp.agents[i], s.game, i) for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
     if s.game.currentEvent == :begin
         res = []
+        obs = []
         for i = 1:10
             nextState = copy(s)
-            performIntActions(nextState.game, actions, seed=i)
+            observationArray = performIntActions(nextState.game, actions, seed=i)
             for j = 1:numPlayers
                 nextNextState = copy(nextState)
                 nextNextState.agent = j
                 push!(res, nextNextState)
+                push!(obs, observationToInt(observationArray[j]))
             end
         end
-        d = StateDistribution(1.0 / 10 / 5, res)
+        d = StateObservationDistribution([1.0 / 10 / 5 for i in 1:50], res, obs)
         return d
     end
+    if s.game.currentEvent in [:mission, :voting]
+        nextProbs::Vector{Float64} = []
+        nextStates::Vector{State} = []
+        nextObservations::Vector{Int} = []
+        enumerateTransitions(s, a, actions, Vector{Int}(), 1, 1.0, nextProbs, nextStates, nextObservations)
+        return StateObservationDistribution(nextProbs, nextStates, nextObservations)
+    end
     nextState = copy(s)
-    performIntActions(nextState.game, actions)
-    d = StateDistribution(1, [nextState])
+    ob = observationToInt(performIntActions(nextState.game, actions)[s.agent])
+    d = StateObservationDistribution([1.0], [nextState], [ob])
     d
 end
 
@@ -208,13 +271,13 @@ end
 
 POMDPs.reward(pomdp::Avalon, s::State, a::Int64, sp::State) = Int(reward(sp.game, sp.agent))
 
-POMDPs.initial_state_distribution(pomdp::Avalon) = StateDistribution(1, [intToState(maxState)])
+POMDPs.initial_state_distribution(pomdp::Avalon) = StateDistribution([1.0], [intToState(maxState)])
 
 POMDPs.actions(::Avalon) = Array(1:10)
 
 POMDPs.discount(pomdp::Avalon) = 1.0
 
-function POMDPs.generate_o(p::Avalon, s::State, a::Int64, sp::State, rng::AbstractRNG)
+function POMDPs.generate_o(p::Avalon, s::State, a::Int64, sp::State, rng::AbstractRNG) # TODO: retrieve from transition
     d = observation(p, s, a, sp)
     return rand(rng, d)
 end
