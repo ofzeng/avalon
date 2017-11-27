@@ -3,7 +3,7 @@ using POMDPs, POMDPToolbox, QMDP, JLD
 using DiscreteValueIteration
 include("avalon.jl")
 
-restore = false
+restore = true
 ns = maxState
 
 type State
@@ -21,10 +21,13 @@ type StupidAgent <: Agent
     end
 end
 
-function getAction(a::StupidAgent, s::State)
-    actions = validActions(s.game, s.agent)
-    if length(actions) > 0
-        return actions[1]
+function getAction(a::StupidAgent, g::Game, agent::Int)
+    actions = validActions(g, agent)
+    return 2
+    if length(actions) > 1
+        return 2
+    elseif length(actions) > 0
+        return 1
     end
     return nothing
 end
@@ -142,9 +145,9 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     if POMDPs.isterminal(pomdp, s)
         return StateDistribution(1, [s])
     end
-    actions::Array{Int, 1} = [2 for i in 1:numPlayers] # todo add agents moves
+    actions::Array{Int, 1} = [getAction(pomdp.agents[i], s.game, i) for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
-    if s.game.currentEvent == :noop
+    if s.game.currentEvent == :begin
         res = []
         for i = 1:10
             nextState = copy(s)
@@ -184,14 +187,16 @@ end
 #end
 
 function POMDPs.observation(pomdp::Avalon, s::State, a::Int64, sp::State)
-    return Distribution(1, [1])
     if POMDPs.isterminal(pomdp, s)
         return Distribution(1, [1])
     end
-    actions::Array{Int, 1} = [2 for i in 1:numPlayers] # todo add agents moves
+    actions::Array{Int, 1} = [getAction(pomdp.agents[i], s.game, i) for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
+    if s.game.currentEvent == :begin
+        return Distribution(1, [sp.agent])
+    end
     nextState = copy(s)
-    obs = performIntActions(nextState.game, actions)[s.agent]
+    obs = performIntActions(nextState.game, actions)[sp.agent]
     intObs = observationToInt(obs)
     d = Distribution(1, [intObs])
     d
@@ -243,7 +248,7 @@ function main()
     end
     # run a short simulation with the QMDP policy
     println("BEGIN SIMULATING")
-    history = simulate(HistoryRecorder(max_steps=40), pomdp, policy, belief_updater)
+    history = simulate(HistoryRecorder(max_steps=100), pomdp, policy, belief_updater)
     println("DONE SIMULATING")
 
     # look at what happened
@@ -254,10 +259,10 @@ function main()
         nonzero = []
         for (j, bp) in enumerate(b.b)
             if bp > 0
-                println("Belief state ", intToState(j))
                 push!(nonzero, (j, bp))
             end
         end
+        println("Belief state example ", intToState(nonzero[1][1]))
         println("belief was $nonzero,")
         println("action $a was taken,")
         println("and observation $o was received. Reward $r\n")
