@@ -89,22 +89,11 @@ function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O)
             newJ = state_index(pomdp, sp)
             pp = pdf(td, sp)
             od = td.obs[j]
-            #println("Old prob $pp, real ob $o, proposed $od, action taken $a")
             pp *= (o == od)
             bnew[newJ] += pp * bold[i]
         end
     end
     println("Iterated through $num_nonzero states")
-    #for (i, sp) in enumerate(pomdp_states)
-        #if i % 100000 == 0
-            #println("i is $i")
-        #end
-        ## get the distributions
-        #od = observation(pomdp, a, sp)
-        ## get prob of observation o from current distribution
-        #probo = pdf(od, o)
-        #bnew[i] *= probo
-    #end
     norm = sum(bnew)
     # if norm is zero, the update was invalid - reset to uniform
     if norm == 0.0

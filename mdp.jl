@@ -221,6 +221,21 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
         d = StateObservationDistribution([1.0 / 10 / 5 for i in 1:50], res, obs)
         return d
     end
+    if s.game.currentEvent == :proposing
+        nextState = copy(s)
+        ob = observationToInt(performIntActions(nextState.game, actions)[s.agent])
+        p = 0.5
+        d = StateObservationDistribution([p], [nextState], [ob])
+        for i = 1:10
+            actions[s.game.proposer] = i
+            nextState = copy(s)
+            ob = observationToInt(performIntActions(nextState.game, actions)[s.agent])
+            push!(d.p, (1-p) / 10.0)
+            push!(d.it, nextState)
+            push!(d.obs, ob)
+        end
+        return d
+    end
     if s.game.currentEvent in [:mission, :voting]
         nextProbs::Vector{Float64} = []
         nextStates::Vector{State} = []
@@ -359,9 +374,9 @@ function playGame(pomdp, agents)
     while !isTerminal(s.game)
         actions = [getAction(agents[i], s.game, i) for i = 1:numPlayers]
         println("________________________________________________________")
-        println("state $s, performing $(actions[3])")
+        println("state $s, \nperforming $(actions[3])")
         obs = performIntActions(s.game, actions)
-        println("observations $(obs[3]), new state $s")
+        println("observations $(obs[3]), new \nstate $s")
         println("belief before $(extractNonzero(agents[3].belief))")
         for (i, ob) = enumerate(obs)
             giveObservation(agents[i], actions[i], observationToInt(ob))
