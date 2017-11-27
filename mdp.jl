@@ -3,7 +3,7 @@ using POMDPs, POMDPToolbox, QMDP, JLD
 using DiscreteValueIteration
 include("avalon.jl")
 
-restore = true
+restore = false
 ns = maxState
 
 type State
@@ -23,7 +23,8 @@ end
 
 function getAction(a::StupidAgent, g::Game, agent::Int)
     actions = validActions(g, agent)
-    return 2
+    #return Int(hash(stateToInt(State(g, agent))) % length(actions)) + 1
+    return Int(hash(g.passes * 10 + g.proposer + g.good[1] * 100 + g.good[2] * 120 + g.good[3] * 420 + g.missionNumber * 719) % length(actions) + 1)
     if length(actions) > 1
         return 2
     elseif length(actions) > 0
