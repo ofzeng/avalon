@@ -72,14 +72,10 @@ POMDPs.obs_index(::Avalon, o::Int64) = o
 #Base.done(::AvalonIterator, state::Int) = state == maxState + 1
 ##Base.done(::AvalonIterator, state::Int) = state == 50000 + 1
 #POMDPs.iterator(a::AvalonIterator) = a
-if !restore
-    statesArray = []
-    for i = 1:maxState
-        push!(statesArray,intToState(i))
-    end
-    save("my_states.jld", "states", statesArray)
-else
-    statesArray = load("my_states")["states"]
+println("GENERATING STATES")
+statesArray = []
+for i = 1:maxState
+    push!(statesArray,intToState(i))
 end
 POMDPs.states(a::Avalon) = statesArray
 POMDPs.observations(a::Avalon) = Array(1:32)
@@ -148,6 +144,20 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     end
     actions::Array{Int, 1} = [2 for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
+    if s.game.currentEvent == :noop
+        res = []
+        for i = 1:10
+            nextState = copy(s)
+            performIntActions(nextState.game, actions, seed=i)
+            for j = 1:numPlayers
+                nextNextState = copy(nextState)
+                nextNextState.agent = j
+                push!(res, nextNextState)
+            end
+        end
+        d = StateDistribution(1.0 / 10 / 5, res)
+        return d
+    end
     nextState = copy(s)
     performIntActions(nextState.game, actions)
     d = StateDistribution(1, [nextState])
@@ -212,7 +222,7 @@ function main()
     if !restore
         println("BEGIN SOLVE")
         tic = time()
-        solver = QMDPSolver(max_iterations=0) # from QMDP
+        solver = QMDPSolver(max_iterations=1) # from QMDP
         policy = solve(solver, pomdp, verbose=true)
         toc = time()
         println(toc - tic)
@@ -244,6 +254,7 @@ function main()
         nonzero = []
         for (j, bp) in enumerate(b.b)
             if bp > 0
+                println("Belief state ", intToState(j))
                 push!(nonzero, (j, bp))
             end
         end

@@ -142,10 +142,13 @@ function completeMission(this::Game, pass::Bool)
     this.currentEvent = :proposing
 end
 
-function performActions(this::Game, actions::Array{Any, 1})
+function performActions(this::Game, actions::Array{Any, 1}; seed::Int=-1)
+    if seed < 0
+        seed = rand(1:10)
+    end
     this.realIndex = 0
     if this.currentEvent == :begin
-        this.good = combinations(3)[rand(1:this.numPlayers)]
+        this.good = combinations(3)[seed]
         this.currentEvent = :proposing
         assert(all([i == :noop for i in actions]))
         return [this.good[agent] for agent in 1:this.numPlayers]
@@ -200,7 +203,7 @@ function observationToInt(obs::Any)
     end
 end
 
-function performIntActions(this::Game, intActions::Array{Int, 1})
+function performIntActions(this::Game, intActions::Array{Int, 1}; seed::Int=-1)
     trueActions::Array{Any, 1} = [:noop for i in intActions]
     if this.currentEvent == :begin
     elseif this.currentEvent == :proposing
@@ -219,7 +222,7 @@ function performIntActions(this::Game, intActions::Array{Int, 1})
             end
         end
     end
-    return performActions(this, trueActions)
+    return performActions(this, trueActions, seed=seed)
 end
 
 #States are ordered in dag order to make easier single pass value iteration
