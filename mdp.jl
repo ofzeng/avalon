@@ -197,7 +197,7 @@ function POMDPs.observation(pomdp::Avalon, s::State, a::Int64, sp::State)
     actions::Array{Int, 1} = [getAction(pomdp.agents[i], s.game, i) for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
     if s.game.currentEvent == :begin
-        return Distribution(1, [sp.agent * 2 + sp.game.good[sp.agent]])
+        return Distribution(1, [observationToInt(sp.agent * 2 + sp.game.good[sp.agent])])
     end
     nextState = copy(s)
     obs = performIntActions(nextState.game, actions)[sp.agent]
@@ -246,14 +246,24 @@ type POMDPAgent <: Agent
     end
 end
 
+function extractNonzero(belief)
+    nonzero = []
+    for (j, bp) in enumerate(belief.b)
+        if bp > 0
+            push!(nonzero, (j, bp))
+        end
+    end
+    return nonzero
+end
+
 function getAction(a::POMDPAgent, g::Game, agent::Int)
     a = action(a.policy, a.belief)
+    return a
 end
 
 function giveObservation(agent::POMDPAgent, a::Int, o::Int)
-    update(agent.updater, agent.belief, a, o)
+    agent.belief = update(agent.updater, agent.belief, a, o)
 end
-
 
 function runGames(pomdp, policy, belief_updater)
     numWins = 0
@@ -268,12 +278,7 @@ function runGames(pomdp, policy, belief_updater)
         totalScore = 0
         for (s, b, a, o, r) in eachstep(history, "sbaor")
             println("State was $s,")
-            nonzero = []
-            for (j, bp) in enumerate(b.b)
-                if bp > 0
-                    push!(nonzero, (j, bp))
-                end
-            end
+            nonzero = extractNonzero(b)
             println("Belief state example ", intToState(nonzero[1][1]))
             println("belief was $nonzero,")
             println("action $a was taken,")
@@ -290,11 +295,15 @@ function playGame(pomdp, agents)
     s = intToState(maxState)
     while !isTerminal(s.game)
         actions = [getAction(agents[i], s.game, i) for i = 1:numPlayers]
+        println("________________________________________________________")
+        println("state $s, performing $(actions[3])")
         obs = performIntActions(s.game, actions)
+        println("observations $(obs[3]), new state $s")
+        println("belief before $(extractNonzero(agents[3].belief))")
         for (i, ob) = enumerate(obs)
             giveObservation(agents[i], actions[i], observationToInt(ob))
         end
-        println(s)
+        println("belief after $(extractNonzero(agents[3].belief))")
     end
 end
 
