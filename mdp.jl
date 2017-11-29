@@ -21,6 +21,22 @@ type StupidAgent <: Agent
     end
 end
 
+type HumanAgent <: Agent
+    function HumanAgent()
+        this = new()
+        this
+    end
+end
+
+function getAction(a::HumanAgent, g::Game, agent::Int)
+    println(validActions(g, agent))
+    return parse(readline())
+end
+
+function giveObservation(agent::HumanAgent, a::Int, o::Int)
+    println("YOU OBSERVE $o")
+end
+
 function getAction(a::StupidAgent, g::Game, agent::Int)
     actions = validActions(g, agent)
     #return Int(hash(stateToInt(State(g, agent))) % length(actions)) + 1
@@ -416,8 +432,9 @@ function main()
     #runGames(pomdp, policy, belief_updater)
     agents::Array{Any, 1} = [StupidAgent() for i in 1:numPlayers]
     agents[3] = POMDPAgent(pomdp, policy, belief_updater)
+    #agents[2] = HumanAgent()
     playGame(pomdp, agents)
     
 end
 
-main()
+#main()
