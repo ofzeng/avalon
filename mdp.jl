@@ -77,12 +77,9 @@ end
 
 mutable struct Avalon <: POMDP{State, Int64, Int64}
     agents::Array{Agent, 1}
-    function Avalon()
+    function Avalon(agents)
         this = new()
-        this.agents = []
-        for i = 1:numPlayers
-            push!(this.agents, StupidAgent())
-        end
+        this.agents = agents
         this
     end
 end

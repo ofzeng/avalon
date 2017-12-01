@@ -1,0 +1,5 @@
+This directory contains level k agents
+
+levelk/my_policy_$k.jld: a QMDP policy for the level k agent
+levelk/my_updater_$k.jld: a belief updater for the level k agent
+levelk/my_simplified_agent_$k.jld: a mapping from state to action
