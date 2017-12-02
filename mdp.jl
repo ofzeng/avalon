@@ -37,6 +37,9 @@ function giveObservation(agent::HumanAgent, a::Int, o::Int)
     println("YOU OBSERVE $o")
 end
 
+function reset(agent::HumanAgent)
+end
+
 function getAction(a::StupidAgent, g::Game, agent::Int)
     actions = validActions(g, agent)
     #return Int(hash(stateToInt(State(g, agent))) % length(actions)) + 1
@@ -53,6 +56,9 @@ function getAction(a::StupidAgent, g::Game, agent::Int)
 end
 
 function giveObservation(agent::StupidAgent, a::Int, o::Int)
+end
+
+function reset(agent::StupidAgent)
 end
 
 function copy(state::State)
@@ -116,6 +122,12 @@ mutable struct StateObservationDistribution
     obs::Vector{Int}
 end
 
+mutable struct StateObservationsDistribution # Gives observations for each agent
+    p::Vector{Float64}
+    it::Vector{State}
+    obs::Vector{Vector{Any}}
+end
+
 mutable struct Distribution
     p::Float64
     it::Vector{Int64}
@@ -126,6 +138,7 @@ end
 POMDPs.iterator(d::Distribution) = d.it
 POMDPs.iterator(d::StateDistribution) = d.it
 POMDPs.iterator(d::StateObservationDistribution) = d.it
+POMDPs.iterator(d::StateObservationsDistribution) = d.it
 
 function POMDPs.pdf(d::StateDistribution, so::State)
     results = find(x->x==so, d.it)
@@ -174,6 +187,19 @@ function POMDPs.rand(rng::AbstractRNG, d::StateObservationDistribution)
     return State()
 end
 
+function POMDPs.rand(rng::AbstractRNG, d::StateObservationsDistribution)
+    weight = 1
+    for i = 1:length(d.it)
+        s = d.it[i]
+        o = d.obs[i]
+        if rand(rng) <= d.p[i] / weight
+            return (s, o)
+        end
+        weight -= d.p[i]
+    end
+    return (State(), 0)
+end
+
 POMDPs.n_states(a::Avalon) = maxState
 POMDPs.n_actions(::Avalon) = 10
 POMDPs.n_observations(::Avalon) = 32
@@ -182,42 +208,38 @@ function POMDPs.isterminal(pomdp::Avalon, s::State)
     return s.game.currentEvent in [:bad_wins, :good_wins]
 end
 
-function enumerateTransitions(s::State, a::Int64, actionProbabilities, actions::Vector{Int}, i, prob, nextProbs::Vector{Float64}, nextStates::Vector{State}, nextObservations::Vector{Int})
+function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int}, i, prob, nextProbs::Vector{Float64}, nextStates::Vector{State}, nextObservations::Vector{Vector{Any}})
     if prob == 0
         return
     end
     if i > length(actionProbabilities)
         nextState = copy(s)
+        #obs = map(observationToInt, performIntActions(nextState.game, actions))
         obs = performIntActions(nextState.game, actions)
-        ob = observationToInt(obs[s.agent])
         push!(nextStates, nextState)
         push!(nextProbs, prob)
-        push!(nextObservations, ob)
+        push!(nextObservations, obs)
         return
     end
-    if s.agent == i
-        push!(actions, a)
-        enumerateTransitions(s, a, actionProbabilities, actions, i + 1, prob, nextProbs, nextStates, nextObservations)
-        pop!(actions)
-    else
-        actionProb = min((actionProbabilities[i] - 1) / 8.0, 1.0)
-        push!(actions, 1)
-        enumerateTransitions(s, a, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
-        pop!(actions)
-        actionProb = 1 - actionProb
-        push!(actions, 2)
-        enumerateTransitions(s, a, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
-        pop!(actions)
-    end
+    #if s.agent == i
+        #push!(actions, a)
+        #enumerateTransitions(s, a, actionProbabilities, actions, i + 1, prob, nextProbs, nextStates, nextObservations)
+        #pop!(actions)
+    #else
+    actionProb = min((actionProbabilities[i] - 1) / 8.0, 1.0)
+    push!(actions, 1)
+    enumerateTransitions(s, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
+    pop!(actions)
+    actionProb = 1 - actionProb
+    push!(actions, 2)
+    enumerateTransitions(s, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
+    pop!(actions)
 end
 
-# Resets the problem after opening door; does nothing after listening
-function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
+function getTransitionProbabilities(pomdp::Avalon, s::State, actions::Vector{Int})
     if POMDPs.isterminal(pomdp, s)
-        return StateObservationDistribution([1.0], [s], [1])
+        return StateObservationsDistribution([1.0], [s], [[1 for _ in 1:numPlayers]])
     end
-    actions::Array{Int, 1} = [getAction(pomdp.agents[i], s.game, i) for i in 1:numPlayers] # todo add agents moves
-    actions[s.agent] = a
     if s.game.currentEvent == :begin
         res = []
         obs = []
@@ -228,21 +250,23 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
                 nextNextState = copy(nextState)
                 nextNextState.agent = j
                 push!(res, nextNextState)
-                push!(obs, observationToInt(observationArray[j]))
+                push!(obs, [(observationArray[j]) for j in 1:numPlayers])
             end
         end
-        d = StateObservationDistribution([1.0 / 10 / 5 for i in 1:50], res, obs)
+        d = StateObservationsDistribution([1.0 / 10 / 5 for i in 1:50], res, obs)
         return d
     end
     if s.game.currentEvent == :proposing
         nextState = copy(s)
-        ob = observationToInt(performIntActions(nextState.game, actions)[s.agent])
+        observations = performIntActions(nextState.game, actions)
+        ob = [(observations[agent]) for agent in 1:numPlayers]
         p = 0.5
-        d = StateObservationDistribution([p], [nextState], [ob])
+        d = StateObservationsDistribution([p], [nextState], [ob])
         for i = 1:10
             actions[s.game.proposer] = i
             nextState = copy(s)
-            ob = observationToInt(performIntActions(nextState.game, actions)[s.agent])
+            observations = performIntActions(nextState.game, actions)
+            ob = [(observations[agent]) for agent in 1:numPlayers]
             push!(d.p, (1-p) / 10.0)
             push!(d.it, nextState)
             push!(d.obs, ob)
@@ -252,14 +276,30 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     if s.game.currentEvent in [:mission, :voting]
         nextProbs::Vector{Float64} = []
         nextStates::Vector{State} = []
-        nextObservations::Vector{Int} = []
-        enumerateTransitions(s, a, actions, Vector{Int}(), 1, 1.0, nextProbs, nextStates, nextObservations)
-        return StateObservationDistribution(nextProbs, nextStates, nextObservations)
+        nextObservations::Vector{Vector{Any}} = []
+        enumerateTransitions(s, actions, Vector{Int}(), 1, 1.0, nextProbs, nextStates, nextObservations)
+        return StateObservationsDistribution(nextProbs, nextStates, nextObservations)
     end
     nextState = copy(s)
-    ob = observationToInt(performIntActions(nextState.game, actions)[s.agent])
-    d = StateObservationDistribution([1.0], [nextState], [ob])
+    observations = performIntActions(nextState.game, actions)
+    ob = [(observations[agent]) for agent in 1:numPlayers]
+    d = StateObservationsDistribution([1.0], [nextState], [ob])
     d
+end
+
+function convert(d::StateObservationsDistribution)
+    obs = [observationToInt(d.obs[i][d.it[i].agent]) for i in 1:length(d.obs)]
+    return StateObservationDistribution(d.p, d.it, obs)
+end
+
+# Resets the problem after opening door; does nothing after listening
+function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
+    if POMDPs.isterminal(pomdp, s)
+        return StateObservationDistribution([1.0], [s], [1])
+    end
+    actions::Array{Int, 1} = [getAction(pomdp.agents[i], s.game, i) for i in 1:numPlayers] # todo add agents moves
+    actions[s.agent] = a
+    return convert(getTransitionProbabilities(pomdp, s, actions))
 end
 
 #function POMDPs.observation(pomdp::Avalon, a::Int64, sp::State)
@@ -356,82 +396,3 @@ function giveObservation(agent::POMDPAgent, a::Int, o::Int)
     agent.belief = update(agent.updater, agent.belief, a, o)
 end
 
-function runGames(pomdp, policy, belief_updater)
-    numWins = 0
-    for sim = 1:10
-        # run a short simulation with the QMDP policy
-        println("BEGIN SIMULATING")
-        history = simulate(HistoryRecorder(max_steps=100), pomdp, policy, belief_updater)
-        println("DONE SIMULATING")
-
-        # look at what happened
-        i = 0
-        totalScore = 0
-        for (s, b, a, o, r) in eachstep(history, "sbaor")
-            println("State was $s,")
-            nonzero = extractNonzero(b)
-            println("Belief state example ", intToState(nonzero[1][1]))
-            println("belief was $nonzero,")
-            println("action $a was taken,")
-            println("and observation $o was received. Reward $r\n")
-            i += 1
-        end
-        println("Discounted reward was $(discounted_reward(history)).")
-        numWins += discounted_reward(history)
-    end
-    println("NUMWINS $numWins")
-end
-
-function playGame(pomdp, agents)
-    s = intToState(maxState)
-    while !isTerminal(s.game)
-        actions = [getAction(agents[i], s.game, i) for i = 1:numPlayers]
-        println("________________________________________________________")
-        println("state $s, \nperforming $(actions[3])")
-        obs = performIntActions(s.game, actions)
-        println("observations $(obs[3]), new \nstate $s")
-        println("belief before $(extractNonzero(agents[3].belief))")
-        for (i, ob) = enumerate(obs)
-            giveObservation(agents[i], actions[i], observationToInt(ob))
-        end
-        println("belief after $(extractNonzero(agents[3].belief))")
-    end
-end
-
-function main()
-    pomdp = Avalon()
-    policy = nothing
-    belief_updater = nothing
-
-    if !restore
-        println("BEGIN SOLVE")
-        tic = time()
-        solver = QMDPSolver(max_iterations=1) # from QMDP
-        policy = solve(solver, pomdp, verbose=true)
-        toc = time()
-        println(toc - tic)
-        tic = time()
-        belief_updater = updater(policy) # the default QMDP belief updater (discrete Bayesian filter)
-        toc = time()
-        println(toc - tic)
-
-        println("BEGIN SAVING")
-        save("my_policy.jld", "policy", policy)
-        save("my_updater.jld", "belief_updater", belief_updater)
-        println("DONE SAVING")
-    else
-        println("BEGIN RESTORE")
-        policy = load("my_policy.jld")["policy"]
-        belief_updater = load("my_updater.jld")["belief_updater"]
-        println("END RESTORE")
-    end
-
-    #runGames(pomdp, policy, belief_updater)
-    agents::Array{Any, 1} = [StupidAgent() for i in 1:numPlayers]
-    agents[3] = POMDPAgent(pomdp, policy, belief_updater)
-    #agents[2] = HumanAgent()
-    playGame(pomdp, agents)
-    
-end
-
-#main()

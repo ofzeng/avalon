@@ -18,16 +18,36 @@ end
 function giveObservation(agent::DictionaryAgent, a::Int, o::Int)
 end
 
+function reset(agent::DictionaryAgent)
+end
+
 type LevelKAgent <: Agent
     k::Int
-    policy
-    updater
+    policy::Any
+    updater::Any
+    belief::Any
 
     function LevelKAgent(k::Int, policy, updater)
         this = new()
         this.k = k
+        this.policy = policy
+        this.updater = updater
+        reset(this)
         this
     end
+end
+
+function getAction(a::LevelKAgent, g::Game, agent::Int)
+    a = action(a.policy, a.belief)
+    return a
+end
+
+function giveObservation(agent::LevelKAgent, a::Int, o::Int)
+    agent.belief = update(agent.updater, agent.belief, a, o)
+end
+
+function reset(agent::LevelKAgent)
+    agent.belief = initialize_belief(agent.updater, StateDistribution([1.0], [intToState(maxState)]))
 end
 
 function generatePolicy(previous_agent)
@@ -45,14 +65,20 @@ function generatePolicy(previous_agent)
     return (policy, belief_updater)
 end
 
+function simplifySolver(k)
+    policy = load("levelk/my_policy_$k.jld")["policy"]
+    updater = load("levelk/my_updater_$k.jld")["updater"]
+    mapping = Dict{Int, Int}()
+    for i = 1:maxState
+        mapping[i] = findmax(policy.alphas[i, :])[2]
+    end
+    save("levelk/my_simplified_agent_$k.jld", "agent", DictionaryAgent(mapping))
+end
+
 function saveSolver(k, policy, updater)
     save("levelk/my_policy_$k.jld", "policy", policy)
     save("levelk/my_updater_$k.jld", "updater", updater)
-    mapping = Dict{Int, Int}
-    for i = 1:maxState
-        mapping[i] = max(policy.alphas[i, :])
-    end
-    save("levelk/my_simplified_agent_$k.jld", "agent", DictionaryAgent(mapping))
+    simplifySolver(k)
 end
 
 function retrieveSolver(k)
@@ -74,4 +100,5 @@ function retrieveSolver(k)
     return LevelKAgent(k, policy, updater)
 end
 
-retrieveSolver(1)
+#retrieveSolver(10)
+#main()
