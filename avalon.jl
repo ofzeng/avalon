@@ -202,6 +202,28 @@ function observationToInt(obs::Any)
     end
 end
 
+function intToAction(this::Game, agent::Int, action::Int)
+    trueAction::Any = :noop
+    if this.currentEvent == :begin
+    elseif this.currentEvent == :proposing
+        if agent == this.proposer
+            options = combinations(playersOnTeam(this.missionNumber))
+            choice = action
+            if choice > length(options)
+                choice = 1
+            end
+            trueAction = options[choice]
+        end
+    elseif this.currentEvent == :voting
+        trueAction = action == 1 ? :down : :up
+    elseif this.currentEvent == :mission
+        if this.proposal[agent]
+            trueAction = action == 1 ? :fail : :pass
+        end
+    end
+    return trueAction
+end
+
 function performIntActions(this::Game, intActions::Array{Int, 1}; seed::Int=-1)
     trueActions::Array{Any, 1} = [:noop for i in intActions]
     if this.currentEvent == :begin
