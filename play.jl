@@ -36,12 +36,12 @@ function playGame(pomdp, agents; verbose=true)
         actions = [getAction(agents[i], s.game, i) for i = 1:numPlayers]
         if verbose
             println("________________________________________________________")
-            println("state $s, \nperforming $actions, $([intToAction(s.game, i, action) for (i, action) in enumerate(actions)])")
+            println("state $s, $(stateToInt(s)), \nperforming $actions, $([intToAction(s.game, i, action) for (i, action) in enumerate(actions)])")
         end
         statePossibilities = getTransitionProbabilities(pomdp, s, actions)
         s, obs = rand(rando, statePossibilities)
         if verbose
-            println("observations $(obs), new \nstate $s")
+            println("observations $(obs), $([observationToInt(ob) for ob in obs]), new \nstate $s, $(stateToInt(s))")
             #println("belief before $(extractNonzero(agents[3].belief))")
         end
         for (i, ob) = enumerate(obs)
@@ -58,10 +58,15 @@ function playNGames(pomdp, agents, n)
     num_good_wins = 0
     agent_wins = [0 for i in 1:numPlayers]
     for i = 1:n
-        if i % 10 == 0
-            println("Game number $i")
-        end
-        endState = playGame(pomdp, agents, verbose=false)
+        println("Game number $i")
+        println("Game number $i")
+        println("Game number $i")
+        println("Game number $i")
+        println("Game number $i")
+        println("Game number $i")
+        println("Game number $i")
+        println("Game number $i")
+        endState = playGame(pomdp, agents, verbose=true)
         if endState.game.currentEvent == :good_wins
             num_good_wins += 1
         else
@@ -113,15 +118,17 @@ function main()
 end
 
 function mainForReal()
-    level1 = retrieveSolver(1)
+    kplusone = retrieveSolver(2)
     #runGames(pomdp, policy, belief_updater)
-    agents::Array{Any, 1} = [StupidAgent() for i in 1:numPlayers]
+    agents::Array{Any, 1} = [retrieveSolver(1) for i in 1:numPlayers]
+    simplifiedAgents::Array{Any, 1} = [retrieveSolver(1) for i in 1:numPlayers]
+    #agents::Array{Any, 1} = [StupidAgent() for i in 1:numPlayers]
     #agents[3] = POMDPAgent(pomdp, policy, belief_updater)
-    agents[1] = level1
-    pomdp = Avalon(agents)
+    agents[1] = kplusone
+    pomdp = Avalon(simplifiedAgents)
     #agents[2] = HumanAgent()
     #playGame(pomdp, agents)
-    playNGames(pomdp, agents, 5)
+    playNGames(pomdp, agents, 20)
 end
 
 mainForReal()

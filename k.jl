@@ -81,6 +81,10 @@ function saveSolver(k, policy, updater)
     simplifySolver(k)
 end
 
+function retrieveSimplifiedSolver(k)
+    return load("levelk/my_simplified_agent_$(k).jld")["agent"]
+end
+
 function retrieveSolver(k)
     println("RETRIEVING $k")
     if k == 0
@@ -93,7 +97,7 @@ function retrieveSolver(k)
         updater = load("levelk/my_updater_$k.jld")["updater"]
     else
         retrieveSolver(k-1) # Ensure existence of previous policy
-        agent = load("levelk/my_simplified_agent_$(k-1).jld")["agent"]
+        agent = retrieveSimplifiedSolver(k-1)
         (policy, updater) = generatePolicy(agent)
         saveSolver(k, policy, updater)
     end

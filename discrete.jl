@@ -89,6 +89,7 @@ function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O)
             newJ = state_index(pomdp, sp)
             pp = pdf(td, sp)
             od = td.obs[j]
+            #println("state $i -> $newJ prob $pp obs $od")
             pp *= (o == od)
             bnew[newJ] += pp * bold[i]
         end
@@ -97,7 +98,8 @@ function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O)
     norm = sum(bnew)
     # if norm is zero, the update was invalid - reset to uniform
     if norm == 0.0
-        println("Invalid update for: ", bold, " ", a, " ", o)
+        println("Invalid update for: ", " ", a, " ", o)
+        #println("Invalid update for: ", bold, " ", a, " ", o)
         u = 1.0/length(bnew)
         fill!(bnew, u)
     else

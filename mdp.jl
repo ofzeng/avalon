@@ -226,7 +226,7 @@ function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int
         #enumerateTransitions(s, a, actionProbabilities, actions, i + 1, prob, nextProbs, nextStates, nextObservations)
         #pop!(actions)
     #else
-    actionProb = min((actionProbabilities[i] - 1) / 8.0, 1.0)
+    actionProb = min((actionProbabilities[i]) / 11.0, 10/11.0)
     push!(actions, 1)
     enumerateTransitions(s, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
     pop!(actions)
