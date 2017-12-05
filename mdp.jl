@@ -41,12 +41,32 @@ type HumanAgent <: Agent
     end
 end
 
-function getAction(a::HumanAgent, g::Game, agent::Int)
-    println(validActions(g, agent))
-    return parse(readline())
+function getActionFromConsole()
+    action = parse(readline())
+    if action in [:up, :pass]
+        action = 1
+    elseif action in [:down, :fail]
+        action = 10
+    elseif action in [:noop]
+        action = 1
+    end
+    return action
 end
 
-function giveObservation(agent::HumanAgent, a::Int, o::Int)
+function getAction(a::HumanAgent, g::Game, agent::Int)
+    println("YOU CAN DO $(validActions(g, agent))")
+    action = nothing
+    while action == nothing
+        try
+            action = getActionFromConsole()
+        catch
+            println("TRY AGAIN")
+        end
+    end
+    return action
+end
+
+function giveObservation(agent::HumanAgent, a::Int, o::Any)
     println("YOU OBSERVE $o")
 end
 
@@ -68,7 +88,7 @@ function getAction(a::StupidAgent, g::Game, agent::Int)
     return nothing
 end
 
-function giveObservation(agent::StupidAgent, a::Int, o::Int)
+function giveObservation(agent::StupidAgent, a::Int, o::Any)
 end
 
 function reset(agent::StupidAgent)
@@ -225,7 +245,7 @@ function POMDPs.isterminal(pomdp::Avalon, s::State)
     return terminal(s)
 end
 
-function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int}, i, prob, nextProbs::Vector{Float64}, nextStates::Vector{State}, nextObservations::Vector{Vector{Any}})
+function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int}, i, prob, nextProbs::Vector{Float64}, nextStates::Vector{State}, nextObservations::Vector{Vector{Any}};test_time=false)
     if prob == 0
         return
     end
@@ -244,6 +264,9 @@ function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int
         #pop!(actions)
     #else
     actionProb = min((actionProbabilities[i]) / 11.0, 10/11.0)
+    if test_time
+        actionProb = min((actionProbabilities[i] - 1) / 9.0, 1.0)
+    end
     push!(actions, 1)
     enumerateTransitions(s, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
     pop!(actions)
@@ -253,7 +276,7 @@ function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int
     pop!(actions)
 end
 
-function getTransitionProbabilities(s::State, actions::Vector{Int})
+function getTransitionProbabilities(s::State, actions::Vector{Int};test_time=false)
     if terminal(s)
         return StateObservationsDistribution([1.0], [s], [[1 for _ in 1:numPlayers]])
     end
@@ -278,6 +301,9 @@ function getTransitionProbabilities(s::State, actions::Vector{Int})
         observations = performIntActions(nextState.game, actions)
         ob = [(observations[agent]) for agent in 1:numPlayers]
         p = 0.5
+        if test_time
+            p = 1.0
+        end
         d = StateObservationsDistribution([p], [nextState], [ob])
         for i = 1:10
             actions[s.game.proposer] = i
@@ -294,7 +320,7 @@ function getTransitionProbabilities(s::State, actions::Vector{Int})
         nextProbs::Vector{Float64} = []
         nextStates::Vector{State} = []
         nextObservations::Vector{Vector{Any}} = []
-        enumerateTransitions(s, actions, Vector{Int}(), 1, 1.0, nextProbs, nextStates, nextObservations)
+        enumerateTransitions(s, actions, Vector{Int}(), 1, 1.0, nextProbs, nextStates, nextObservations, test_time=test_time)
         return StateObservationsDistribution(nextProbs, nextStates, nextObservations)
     end
     nextState = copy(s)
@@ -409,7 +435,8 @@ function getAction(a::POMDPAgent, g::Game, agent::Int)
     return a
 end
 
-function giveObservation(agent::POMDPAgent, a::Int, o::Int)
+function giveObservation(agent::POMDPAgent, a::Int, ob::Int)
+    o = observationToInt(ob)
     agent.belief = update(agent.updater, agent.belief, a, o)
 end
 
