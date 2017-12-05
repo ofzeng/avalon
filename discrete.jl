@@ -94,7 +94,7 @@ function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O)
             bnew[newJ] += pp * bold[i]
         end
     end
-    println("Iterated through $num_nonzero states")
+    #println("Iterated through $num_nonzero states")
     norm = sum(bnew)
     # if norm is zero, the update was invalid - reset to uniform
     if norm == 0.0

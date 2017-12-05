@@ -70,9 +70,22 @@ function simplifySolver(k)
     updater = load("levelk/my_updater_$k.jld")["updater"]
     mapping = Dict{Int, Int}()
     for i = 1:maxState
-        mapping[i] = findmax(policy.alphas[i, :])[2]
+        #mapping[i] = findmax(policy.alphas[i, :])[2]
+        parallelStates = getParallelStates(i)
+        bestAction = 0
+        bestScore = -1000
+        for a = 1:length(policy.alphas[1])
+            score = 0
+            for j = parallelStates
+                score += policy.alphas[j][a]
+            end
+            if score > bestScore
+                bestAction = a
+            end
+        end
+        mapping[i] = bestAction
     end
-    save("levelk/my_simplified_agent_$k.jld", "agent", DictionaryAgent(mapping))
+    save("levelk/my_simplified_agent_noknowledge_$k.jld", "agent", DictionaryAgent(mapping))
 end
 
 function saveSolver(k, policy, updater)
@@ -82,13 +95,15 @@ function saveSolver(k, policy, updater)
 end
 
 function retrieveSimplifiedSolver(k)
-    return load("levelk/my_simplified_agent_$(k).jld")["agent"]
+    return load("levelk/my_simplified_agent_noknowledge_$(k).jld")["agent"]
 end
 
-function retrieveSolver(k)
-    println("RETRIEVING $k")
+function retrieveSolver(k;verbose=true)
+    if verbose
+        println("RETRIEVING $k")
+    end
     if k == 0
-        save("levelk/my_simplified_agent_$k.jld", "agent", StupidAgent())
+        save("levelk/my_simplified_agent_noknowledge_$k.jld", "agent", StupidAgent())
         return StupidAgent()
     end
     policy, updater = nothing, nothing

@@ -11,6 +11,19 @@ type State
     agent::Int
 end
 
+function getParallelStates(si::Int)
+    state = intToState(si)
+    states = []
+    for i = combinations(3)
+        if i[state.agent] == state.game.good[state.agent]
+            newS = copy(state)
+            newS.game.good = i
+            push!(states, stateToInt(newS))
+        end
+    end
+    return states
+end
+
 abstract type Agent
 end
 
@@ -204,8 +217,12 @@ POMDPs.n_states(a::Avalon) = maxState
 POMDPs.n_actions(::Avalon) = 10
 POMDPs.n_observations(::Avalon) = 32
 
-function POMDPs.isterminal(pomdp::Avalon, s::State)
+function terminal(s::State)
     return s.game.currentEvent in [:bad_wins, :good_wins]
+end
+
+function POMDPs.isterminal(pomdp::Avalon, s::State)
+    return terminal(s)
 end
 
 function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int}, i, prob, nextProbs::Vector{Float64}, nextStates::Vector{State}, nextObservations::Vector{Vector{Any}})
@@ -236,8 +253,8 @@ function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int
     pop!(actions)
 end
 
-function getTransitionProbabilities(pomdp::Avalon, s::State, actions::Vector{Int})
-    if POMDPs.isterminal(pomdp, s)
+function getTransitionProbabilities(s::State, actions::Vector{Int})
+    if terminal(s)
         return StateObservationsDistribution([1.0], [s], [[1 for _ in 1:numPlayers]])
     end
     if s.game.currentEvent == :begin
@@ -299,7 +316,7 @@ function POMDPs.transition(pomdp::Avalon, s::State, a::Int64)
     end
     actions::Array{Int, 1} = [getAction(pomdp.agents[i], s.game, i) for i in 1:numPlayers] # todo add agents moves
     actions[s.agent] = a
-    return convert(getTransitionProbabilities(pomdp, s, actions))
+    return convert(getTransitionProbabilities(s, actions))
 end
 
 #function POMDPs.observation(pomdp::Avalon, a::Int64, sp::State)
