@@ -165,7 +165,7 @@ function performActions(this::Game, actions::Array{Any, 1}; seed::Int=-1)
             this.currentEvent = :mission
         else
             if this.proposer == 5
-                completeMission(this, true)
+                completeMission(this, false)
             else
                 this.proposer += 1
                 this.currentEvent = :proposing
