@@ -1,11 +1,15 @@
 include("k.jl")
 
+seed = Int(time() * 1000000000)
+println("SEED $seed")
+rando = MersenneTwister(seed)
+
 function playGame(agents; verbose=true)
     for agent in agents
         reset(agent)
     end
     s = intToState(maxState)
-    rando = MersenneTwister(Int(time() * 1000000))
+    #rando = MersenneTwister(Int(time() * 1000000))
     while !isTerminal(s.game)
         actions::Vector{Int} = [getAction(agents[i], s.game, i) for i = 1:numPlayers]
         if verbose
@@ -63,6 +67,13 @@ function getAppropriateSolver(description;verbose=false)
         return HumanAgent()
     elseif description == :stupid
         return StupidAgent()
+    elseif typeof(description) == Tuple{Int, Int}
+        policy = retrieveSimplifiedSolver(description[2])
+        #for i = 1:maxState
+            #s = intToState(i)
+            #println("i $i, action $(getAction(policy, s.game, s.agent))")
+        #end
+        return policy
     end
     assert(false)
 end
@@ -103,15 +114,26 @@ function runGame(description; n=1, verbose=true)
     println("-------------------------END RESULTS----------------------")
 end
 
-function main()
-    runGame([:human,:stupid, :stupid,:stupid,:stupid],n=1,verbose=false)
-    return
+retrieveSolver(20)
 
-    k = 1
-    runGame([k+1,k,k,k,k], n=1, verbose=true)
-    k = 2
-    runGame([k+1,k,k,k,k], n=1, verbose=true)
+function main()
+    k = (0,1)
+    runGame([:human,k,k,k,k],n=1,verbose=false)
     return
+    k = 3
+    runGame([:human,k,k,k,k],n=1,verbose=false)
+    runGame([:human,k,k,k,k],n=1,verbose=false)
+    runGame([:human,k,k,k,k],n=1,verbose=false)
+    return
+    #runGame([:human,:stupid, :stupid,:stupid,:stupid],n=1,verbose=false)
+    #runGame([:human,:stupid, :stupid,:stupid,:stupid],n=1,verbose=false)
+    #runGame([:human,:stupid, :stupid,:stupid,:stupid],n=1,verbose=false)
+
+    #k = 1
+    #runGame([k+1,k,k,k,k], n=1, verbose=false)
+    #k = 2
+    #runGame([k+1,k,k,k,k], n=1, verbose=false)
+    #return
     runGame([:stupid,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
     k = 1
     runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)

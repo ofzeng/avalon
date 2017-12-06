@@ -15,7 +15,7 @@ function getAction(a::DictionaryAgent, g::Game, agent::Int)
     return a.map[i]
 end
 
-function giveObservation(agent::DictionaryAgent, a::Int, o::Int)
+function giveObservation(agent::DictionaryAgent, a::Int, o::Any)
 end
 
 function reset(agent::DictionaryAgent)
@@ -42,7 +42,8 @@ function getAction(a::LevelKAgent, g::Game, agent::Int)
     return a
 end
 
-function giveObservation(agent::LevelKAgent, a::Int, o::Int)
+function giveObservation(agent::LevelKAgent, a::Int, ob::Any)
+    o = observationToInt(ob)
     agent.belief = update(agent.updater, agent.belief, a, o)
 end
 
@@ -66,20 +67,21 @@ function generatePolicy(previous_agent)
 end
 
 function simplifySolver(k)
-    policy = load("levelk/my_policy_$k.jld")["policy"]
-    updater = load("levelk/my_updater_$k.jld")["updater"]
+    agent = retrieveSolver(k;verbose=true)
+    policy = agent.policy
+    updater = agent.updater
     mapping = Dict{Int, Int}()
     for i = 1:maxState
-        #mapping[i] = findmax(policy.alphas[i, :])[2]
         parallelStates = getParallelStates(i)
         bestAction = 0
         bestScore = -1000
-        for a = 1:length(policy.alphas[1])
+        for a = 1:length(policy.alphas[1, :])
             score = 0
             for j = parallelStates
-                score += policy.alphas[j][a]
+                score += policy.alphas[j, a]
             end
             if score > bestScore
+                bestScore = score
                 bestAction = a
             end
         end
@@ -95,7 +97,12 @@ function saveSolver(k, policy, updater)
 end
 
 function retrieveSimplifiedSolver(k)
-    return load("levelk/my_simplified_agent_noknowledge_$(k).jld")["agent"]
+    try
+        return load("levelk/my_simplified_agent_noknowledge_$(k).jld")["agent"]
+    catch
+        simplifySolver(k)
+        return load("levelk/my_simplified_agent_noknowledge_$(k).jld")["agent"]
+    end
 end
 
 function retrieveSolver(k;verbose=true)

@@ -49,6 +49,8 @@ function getActionFromConsole()
         action = 10
     elseif action in [:noop]
         action = 1
+    elseif typeof(action) != Int
+        error()
     end
     return action
 end
@@ -247,12 +249,20 @@ end
 
 function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int}, i, prob, nextProbs::Vector{Float64}, nextStates::Vector{State}, nextObservations::Vector{Vector{Any}};test_time=false)
     if prob == 0
+        #if test_time
+            #println("BYE")
+        #end
         return
     end
     if i > length(actionProbabilities)
         nextState = copy(s)
         #obs = map(observationToInt, performIntActions(nextState.game, actions))
         obs = performIntActions(nextState.game, actions)
+        #if test_time
+            #println("ADDING")
+            #println(actionProbabilities)
+            #println(actions, " ", prob)
+        #end
         push!(nextStates, nextState)
         push!(nextProbs, prob)
         push!(nextObservations, obs)
@@ -266,17 +276,24 @@ function enumerateTransitions(s::State, actionProbabilities, actions::Vector{Int
     actionProb = min((actionProbabilities[i]) / 11.0, 10/11.0)
     if test_time
         actionProb = min((actionProbabilities[i] - 1) / 9.0, 1.0)
+        #if !(actionProb in [0,1])
+            #println("Not all or nothing $actionProb")
+        #end
     end
     push!(actions, 1)
-    enumerateTransitions(s, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
+    enumerateTransitions(s, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations, test_time=test_time)
     pop!(actions)
     actionProb = 1 - actionProb
+    #if test_time
+        #println("HI3 $actionProb")
+    #end
     push!(actions, 2)
-    enumerateTransitions(s, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations)
+    enumerateTransitions(s, actionProbabilities, actions, i + 1, prob * actionProb, nextProbs, nextStates, nextObservations, test_time=test_time)
     pop!(actions)
 end
 
 function getTransitionProbabilities(s::State, actions::Vector{Int};test_time=false)
+    #println("HI")
     if terminal(s)
         return StateObservationsDistribution([1.0], [s], [[1 for _ in 1:numPlayers]])
     end
