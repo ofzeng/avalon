@@ -68,7 +68,7 @@ end
 
 
 # Updates the belief given the current action and observation
-function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O)
+function update{A,O}(bu::DiscreteUpdater, bold::DiscreteBelief, a::A, o::O;verbose=false)
     bnew = create_belief(bu)
     pomdp = bu.pomdp
     # initialize spaces

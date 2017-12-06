@@ -11,11 +11,12 @@ type DictionaryAgent <: Agent
 end
 
 function getAction(a::DictionaryAgent, g::Game, agent::Int)
+    g.realIndex = 0
     i = stateToInt(State(g, agent))
     return a.map[i]
 end
 
-function giveObservation(agent::DictionaryAgent, a::Int, o::Any)
+function giveObservation(agent::DictionaryAgent, a::Int, o::Any;verbose=false)
 end
 
 function reset(agent::DictionaryAgent)
@@ -42,9 +43,9 @@ function getAction(a::LevelKAgent, g::Game, agent::Int)
     return a
 end
 
-function giveObservation(agent::LevelKAgent, a::Int, ob::Any)
+function giveObservation(agent::LevelKAgent, a::Int, ob::Any;verbose=false)
     o = observationToInt(ob)
-    agent.belief = update(agent.updater, agent.belief, a, o)
+    agent.belief = update(agent.updater, agent.belief, a, o, verbose=verbose)
 end
 
 function reset(agent::LevelKAgent)
@@ -75,18 +76,37 @@ function simplifySolver(k)
         parallelStates = getParallelStates(i)
         bestAction = 0
         bestScore = -1000
+        if i > 100000
+            println("--------------------------------------------------------------------------------------------------")
+            s = intToState(i)
+            agent = s.agent
+            println("i $i agent $agent state $s")
+        end
         for a = 1:length(policy.alphas[1, :])
             score = 0
+            if i > 100000
+                println("i $i a $a")
+            end
             for j = parallelStates
                 score += policy.alphas[j, a]
+                if i > 100000
+                    println("j $j alph $(policy.alphas[j, a]) score $score")
+                end
+            end
+            if i > 100000
+                println("Score $score a $a bestScore $bestScore bestAction $bestAction")
             end
             if score > bestScore
                 bestScore = score
                 bestAction = a
             end
         end
+        if i > 100000
+            println("Chose $bestAction")
+        end
         mapping[i] = bestAction
     end
+    #println(mapping)
     save("levelk/my_simplified_agent_noknowledge_$k.jld", "agent", DictionaryAgent(mapping))
 end
 

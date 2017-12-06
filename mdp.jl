@@ -68,7 +68,7 @@ function getAction(a::HumanAgent, g::Game, agent::Int)
     return action
 end
 
-function giveObservation(agent::HumanAgent, a::Int, o::Any)
+function giveObservation(agent::HumanAgent, a::Int, o::Any;verbose=false)
     println("YOU OBSERVE $o")
 end
 
@@ -90,7 +90,7 @@ function getAction(a::StupidAgent, g::Game, agent::Int)
     return nothing
 end
 
-function giveObservation(agent::StupidAgent, a::Int, o::Any)
+function giveObservation(agent::StupidAgent, a::Int, o::Any;verbose=false)
 end
 
 function reset(agent::StupidAgent)
@@ -452,7 +452,7 @@ function getAction(a::POMDPAgent, g::Game, agent::Int)
     return a
 end
 
-function giveObservation(agent::POMDPAgent, a::Int, ob::Int)
+function giveObservation(agent::POMDPAgent, a::Int, ob::Int;verbose=false)
     o = observationToInt(ob)
     agent.belief = update(agent.updater, agent.belief, a, o)
 end

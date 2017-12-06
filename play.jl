@@ -27,37 +27,14 @@ function playGame(agents; verbose=true)
             #giveObservation(agents[i], actions[i], observationToInt(ob))
         end
         if verbose
-            #println("belief after $(extractNonzero(agents[3].belief))")
+            for (sn, prob) in extractNonzero(agents[2].belief)
+                ss = intToState(sn)
+                good = ss.game.good
+                println("State number $sn good $good prob $prob")
+            end
         end
     end
     return s
-end
-
-function playNGames(agents, n)
-    num_good_wins = 0
-    agent_wins = [0 for i in 1:numPlayers]
-    for i = 1:n
-        println("Game number $i")
-        println("Game number $i")
-        println("Game number $i")
-        println("Game number $i")
-        println("Game number $i")
-        println("Game number $i")
-        println("Game number $i")
-        println("Game number $i")
-        endState = playGame(agents, verbose=true)
-        if endState.game.currentEvent == :good_wins
-            num_good_wins += 1
-        else
-            assert(endState.game.currentEvent == :bad_wins)
-        end
-        for agent in 1:numPlayers
-            agent_wins[agent] += Int(reward(endState.game, agent))
-        end
-    end
-    win_rate = num_good_wins / n
-    println("n $n good $num_good_wins, wr $win_rate")
-    println(agent_wins)
 end
 
 function getAppropriateSolver(description;verbose=false)
@@ -69,10 +46,22 @@ function getAppropriateSolver(description;verbose=false)
         return StupidAgent()
     elseif typeof(description) == Tuple{Int, Int}
         policy = retrieveSimplifiedSolver(description[2])
-        #for i = 1:maxState
+        #println("CHECKING")
+        #for i = 100000:maxState
             #s = intToState(i)
-            #println("i $i, action $(getAction(policy, s.game, s.agent))")
+            #a = getAction(policy, s.game, s.agent)
+            #for agent = 1:numPlayers
+                #a2 = getAction(policy, s.game, agent)
+                #if a != 1#a2
+                    #println("s $s i $i a $(s.agent) a2 $agent $a $a2")
+                #else
+                    ##println("bad: s $s i $i a $(s.agent) a2 $agent $a $a2")
+                #end
+            #end
+            ##states = getParallelStates(i)
+            ##println("i $i, action $(getAction(policy, s.game, s.agent))")
         #end
+        #println("CHECKINGDONE")
         return policy
     end
     assert(false)
@@ -86,10 +75,10 @@ function runGame(description; n=1, verbose=true)
         agent_wins[d] = 0
     end
     for i = 1:n
+        #description = shuffle(description)
         if verbose
             println(description)
         end
-        description = shuffle(description)
         agents = map(getAppropriateSolver, description)
         endState = playGame(agents, verbose=verbose)
         if endState.game.currentEvent == :good_wins
@@ -98,6 +87,7 @@ function runGame(description; n=1, verbose=true)
             assert(endState.game.currentEvent == :bad_wins)
         end
         for agent in 1:numPlayers
+            println(Int(reward(endState.game, agent)))
             agent_wins[description[agent]] += Int(reward(endState.game, agent))
             agent_id_wins[agent] += Int(reward(endState.game, agent))
         end
@@ -114,26 +104,28 @@ function runGame(description; n=1, verbose=true)
     println("-------------------------END RESULTS----------------------")
 end
 
-retrieveSolver(20)
-
 function main()
-    k = (0,1)
-    runGame([:human,k,k,k,k],n=1,verbose=false)
-    return
-    k = 3
-    runGame([:human,k,k,k,k],n=1,verbose=false)
-    runGame([:human,k,k,k,k],n=1,verbose=false)
-    runGame([:human,k,k,k,k],n=1,verbose=false)
-    return
-    #runGame([:human,:stupid, :stupid,:stupid,:stupid],n=1,verbose=false)
-    #runGame([:human,:stupid, :stupid,:stupid,:stupid],n=1,verbose=false)
-    #runGame([:human,:stupid, :stupid,:stupid,:stupid],n=1,verbose=false)
-
-    #k = 1
-    #runGame([k+1,k,k,k,k], n=1, verbose=false)
-    #k = 2
-    #runGame([k+1,k,k,k,k], n=1, verbose=false)
+    #getParallelStates(100)
     #return
+    #simplifySolver(1)
+    #return
+    k = 1
+    runGame([(0, k),k+1,(0, k),(0, k),(0, k)], n=1, verbose=true)
+    #runGame([k+1,(0, k),(0, k),(0, k),(0, k)], n=5, verbose=false)
+    ##runGame([k+1,k,k,k,k], n=5, verbose=false)
+    return
+    #k = 2
+    #runGame([k,k,k,k,k], n=5, verbose=false)
+    #runGame([k+1,k,k,k,k], n=5, verbose=false)
+    #println("--------")
+    #k = (0,1)
+    #runGame([:human,k,k,k,k],n=1,verbose=false)
+    #return
+    k = 1
+    runGame([:human,k,k,k,k],n=1,verbose=true)
+    runGame([:human,k,k,k,k],n=1,verbose=false)
+    runGame([:human,k,k,k,k],n=1,verbose=false)
+    return
     runGame([:stupid,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
     k = 1
     runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
@@ -147,18 +139,6 @@ function main()
     runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
     runGame([k,k,k,k,k], n=10, verbose=false)
     runGame([k+1,k,k,k,k], n=10, verbose=false)
-    k = 4
-    runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
-    runGame([k,k,k,k,k], n=10, verbose=false)
-    runGame([k+1,k,k,k,k], n=10, verbose=false)
-    #runGame([:stupid, :stupid, :stupid, :stupid, :stupid], n=10, verbose=false)
-    #runGame([1,:stupid, :stupid, :stupid, :stupid], n=10, verbose=false)
-    #runGame([1,1,1,1,1], n=10, verbose=false)
-    #runGame([1,1,1,1,2], n=10, verbose=false)
-    #runGame([1,1,1,1,2], n=10, verbose=false)
-    #runGame([3,2,2,2,2], n=10, verbose=false)
-    #runGame([3,3,3,3,3], n=10, verbose=false)
-    #runGame([4,3,3,3,3], n=10, verbose=false)
 end
 
 main()
