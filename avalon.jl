@@ -77,7 +77,7 @@ type Game
 end
 
 function copy(game::Game)
-    return Game(game.realIndex, game.numPlayers, copy(game.good), game.missionNumber, copy(game.passes), game.proposer, game.proposal, game.currentEvent)
+    return Game(0, game.numPlayers, copy(game.good), game.missionNumber, copy(game.passes), game.proposer, game.proposal, game.currentEvent)
 end
 
 function reward(game::Game, agent::Int) # reward for entering state
