@@ -26,13 +26,13 @@ function playGame(agents; verbose=true)
             giveObservation(agents[i], actions[i], ob)
             #giveObservation(agents[i], actions[i], observationToInt(ob))
         end
-        if verbose
-            for (sn, prob) in extractNonzero(agents[2].belief)
-                ss = intToState(sn)
-                good = ss.game.good
-                println("State number $sn good $good prob $prob")
-            end
-        end
+        #if verbose
+            #for (sn, prob) in extractNonzero(agents[2].belief)
+                #ss = intToState(sn)
+                #good = ss.game.good
+                #println("State number $sn good $good prob $prob")
+            #end
+        #end
     end
     return s
 end
@@ -75,7 +75,7 @@ function runGame(description; n=1, verbose=true)
         agent_wins[d] = 0
     end
     for i = 1:n
-        #description = shuffle(description)
+        description = shuffle(description)
         if verbose
             println(description)
         end
@@ -87,7 +87,6 @@ function runGame(description; n=1, verbose=true)
             assert(endState.game.currentEvent == :bad_wins)
         end
         for agent in 1:numPlayers
-            println(Int(reward(endState.game, agent)))
             agent_wins[description[agent]] += Int(reward(endState.game, agent))
             agent_id_wins[agent] += Int(reward(endState.game, agent))
         end
@@ -105,15 +104,17 @@ function runGame(description; n=1, verbose=true)
 end
 
 function main()
+    #retrieveSolver(200)
     #getParallelStates(100)
     #return
     #simplifySolver(1)
     #return
-    k = 1
-    runGame([(0, k),k+1,(0, k),(0, k),(0, k)], n=1, verbose=true)
-    #runGame([k+1,(0, k),(0, k),(0, k),(0, k)], n=5, verbose=false)
-    ##runGame([k+1,k,k,k,k], n=5, verbose=false)
-    return
+    #for k = 1:4
+        ##runGame([(0, k),k+1,(0, k),(0, k),(0, k)], n=1, verbose=true)
+        #runGame([k+1,(0, k),(0, k),(0, k),(0, k)], n=5, verbose=false)
+        ##runGame([k+1,k,k,k,k], n=5, verbose=false)
+    #end
+    #return
     #k = 2
     #runGame([k,k,k,k,k], n=5, verbose=false)
     #runGame([k+1,k,k,k,k], n=5, verbose=false)
@@ -121,24 +122,18 @@ function main()
     #k = (0,1)
     #runGame([:human,k,k,k,k],n=1,verbose=false)
     #return
-    k = 1
-    runGame([:human,k,k,k,k],n=1,verbose=true)
+    k = 3
+    runGame([:human,k,k,k,k],n=1,verbose=false)
     runGame([:human,k,k,k,k],n=1,verbose=false)
     runGame([:human,k,k,k,k],n=1,verbose=false)
     return
     runGame([:stupid,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
-    k = 1
-    runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
-    runGame([k,k,k,k,k], n=10, verbose=false)
-    runGame([k+1,k,k,k,k], n=10, verbose=false)
-    k = 2
-    runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
-    runGame([k,k,k,k,k], n=10, verbose=false)
-    runGame([k+1,k,k,k,k], n=10, verbose=false)
-    k = 3
-    runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
-    runGame([k,k,k,k,k], n=10, verbose=false)
-    runGame([k+1,k,k,k,k], n=10, verbose=false)
+    for k = 1:3
+        #runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
+        runGame([k+1,(0,k),(0,k),(0,k),(0,k)], n=10, verbose=false)
+        runGame([k,k,k,k,k], n=10, verbose=false)
+        runGame([k+1,k,k,k,k], n=10, verbose=false)
+    end
 end
 
 main()

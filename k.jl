@@ -11,8 +11,7 @@ type DictionaryAgent <: Agent
 end
 
 function getAction(a::DictionaryAgent, g::Game, agent::Int)
-    g.realIndex = 0
-    i = stateToInt(State(g, agent))
+    i = stateToInt(State(g, agent), ignore_cache=true)
     return a.map[i]
 end
 
@@ -76,34 +75,34 @@ function simplifySolver(k)
         parallelStates = getParallelStates(i)
         bestAction = 0
         bestScore = -1000
-        if i > 100000
-            println("--------------------------------------------------------------------------------------------------")
-            s = intToState(i)
-            agent = s.agent
-            println("i $i agent $agent state $s")
-        end
+        #if i > 100000
+            #println("--------------------------------------------------------------------------------------------------")
+            #s = intToState(i)
+            #agent = s.agent
+            #println("i $i agent $agent state $s")
+        #end
         for a = 1:length(policy.alphas[1, :])
             score = 0
-            if i > 100000
-                println("i $i a $a")
-            end
+            #if i > 100000
+                #println("i $i a $a")
+            #end
             for j = parallelStates
                 score += policy.alphas[j, a]
-                if i > 100000
-                    println("j $j alph $(policy.alphas[j, a]) score $score")
-                end
+                #if i > 100000
+                    #println("j $j alph $(policy.alphas[j, a]) score $score")
+                #end
             end
-            if i > 100000
-                println("Score $score a $a bestScore $bestScore bestAction $bestAction")
-            end
+            #if i > 100000
+                #println("Score $score a $a bestScore $bestScore bestAction $bestAction")
+            #end
             if score > bestScore
                 bestScore = score
                 bestAction = a
             end
         end
-        if i > 100000
-            println("Chose $bestAction")
-        end
+        #if i > 100000
+            #println("Chose $bestAction")
+        #end
         mapping[i] = bestAction
     end
     #println(mapping)

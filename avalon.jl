@@ -64,6 +64,7 @@ type Game
 
     function Game(realIndex, numPlayers, good, missionNumber, passes, proposer, proposal, currentEvent)
         this = new()
+        #this.realIndex = 0
         this.realIndex = realIndex
         this.numPlayers = numPlayers
         this.missionNumber = missionNumber
@@ -247,8 +248,8 @@ function performIntActions(this::Game, intActions::Array{Int, 1}; seed::Int=-1)
 end
 
 #States are ordered in dag order to make easier single pass value iteration
-function gameToInt(game::Game, agent::Int)
-    if game.realIndex > 0
+function gameToInt(game::Game, agent::Int;ignore_cache=false)
+    if game.realIndex > 0 && !ignore_cache
         return game.realIndex
     end
     if game.currentEvent == :begin

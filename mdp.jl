@@ -102,9 +102,9 @@ end
 
 statesArray = nothing
 
-function stateToInt(state::State)
+function stateToInt(state::State; ignore_cache=false)
     assert(state.agent in 1:numPlayers)
-    return gameToInt(state.game, state.agent)
+    return gameToInt(state.game, state.agent, ignore_cache=ignore_cache)
 end
 
 function intToState(int::Int)
@@ -140,6 +140,7 @@ println("GENERATING STATES")
 statesArray = []
 for i = 1:maxState
     push!(statesArray,intToState(i))
+    assert(stateToInt(statesArray[i]) == i)
 end
 POMDPs.states(a::Avalon) = statesArray
 POMDPs.observations(a::Avalon) = Array(1:32)
