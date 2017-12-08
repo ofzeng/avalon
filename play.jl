@@ -104,36 +104,15 @@ function runGame(description; n=1, verbose=true)
 end
 
 function main()
-    #retrieveSolver(200)
-    #getParallelStates(100)
-    #return
-    #simplifySolver(1)
-    #return
-    #for k = 1:4
-        ##runGame([(0, k),k+1,(0, k),(0, k),(0, k)], n=1, verbose=true)
-        #runGame([k+1,(0, k),(0, k),(0, k),(0, k)], n=5, verbose=false)
-        ##runGame([k+1,k,k,k,k], n=5, verbose=false)
-    #end
-    #return
-    #k = 2
-    #runGame([k,k,k,k,k], n=5, verbose=false)
-    #runGame([k+1,k,k,k,k], n=5, verbose=false)
-    #println("--------")
-    #k = (0,1)
-    #runGame([:human,k,k,k,k],n=1,verbose=false)
-    #return
-    k = 3
-    runGame([:human,k,k,k,k],n=1,verbose=false)
-    runGame([:human,k,k,k,k],n=1,verbose=false)
-    runGame([:human,k,k,k,k],n=1,verbose=false)
-    return
-    runGame([:stupid,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
-    for k = 1:3
-        #runGame([k,:stupid,:stupid,:stupid,:stupid], n=10, verbose=false)
-        runGame([k+1,(0,k),(0,k),(0,k),(0,k)], n=10, verbose=false)
-        runGame([k,k,k,k,k], n=10, verbose=false)
-        runGame([k+1,k,k,k,k], n=10, verbose=false)
-    end
+
+    retrieveSolver(50)
+
+    for k = 1:7
+        runGame([k+1, (0,k), (0,k), (0,k), (0,k)], n=20, verbose=false)
+        runGame([k,k,k,k,k], n=20, verbose=false)
+        runGame([k+1,k,k,k,k], n=20, verbose=false)
+        runGame([k,1,1,1,1], n=20, verbose=false)
+    end 
 end
 
 main()
